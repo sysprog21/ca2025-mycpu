@@ -1,8 +1,8 @@
 # Single-Cycle RISC-V CPU
 
-A single-cycle processor implementation in Chisel that completes instruction execution within one clock period.
-This design approach eliminates instruction conflicts since only one instruction executes at any given time,
-simplifying implementation despite performance limitations.
+This project implements a single-cycle RISC-V processor in Chisel where each instruction completes within one clock period.
+The design eliminates instruction conflicts by executing only one instruction at any given time.
+This approach simplifies implementation at the cost of performance limitations since the clock period must accommodate the slowest instruction path.
 
 ## Architecture Overview
 
@@ -174,7 +174,7 @@ Located in `src/test/scala/riscv/singlecycle/`:
 7. Quicksort: Runs quicksort algorithm on 10 elements
 
 All unit tests pass successfully:
-```bash
+```shell
 make test
 # Total number of tests run: 9
 # Tests: succeeded 9, failed 0
@@ -197,7 +197,7 @@ Test Coverage:
 - Upper immediate: LUI, AUIPC
 
 Running Compliance Tests:
-```bash
+```shell
 make compliance
 # Expected duration: 10-15 minutes
 # Results saved to: results/report.html
@@ -222,7 +222,7 @@ These warnings are expected and harmless. The RISC-V programs use stack addresse
 
 ### Running Simulations
 
-```bash
+```shell
 # Basic simulation (no program loaded)
 make sim
 
@@ -248,9 +248,11 @@ Located in `csrc/` and `src/main/resources/`:
 
 ### Waveform Analysis
 
-View simulation waveforms with GTKWave:
-```bash
+View simulation waveforms with GTKWave or Surfer:
+```shell
 gtkwave trace.vcd
+# or
+surfer trace.vcd
 ```
 
 Key signals to observe:

@@ -1,6 +1,8 @@
 # Pipelined RISC-V CPU Lab
 
-This directory contains the pipelined RV32I cores used throughout Lab 3. Every design builds upon the single-cycle baseline and shares the same front-end (instruction memory, register file) and peripheral models as the previous labs. The goal is to show how progressively richer pipeline techniques eliminate performance bottlenecks while preserving architectural correctness.
+This project contains four pipelined RV32I processor implementations that demonstrate progressive performance optimization techniques.
+Each design builds upon the single-cycle baseline while sharing common infrastructure including instruction memory, register file, and peripheral models from previous labs.
+The implementations show how increasingly sophisticated pipeline techniques eliminate performance bottlenecks while preserving architectural correctness.
 
 ## Implementations at a Glance
 
@@ -86,7 +88,7 @@ The test suite validates all four pipeline implementations (ThreeStage, FiveStag
    - Control signal propagation
 
 All unit tests pass successfully:
-```bash
+```shell
 make test
 # Total number of tests run: 25
 # Tests: succeeded 25, failed 0
@@ -105,7 +107,7 @@ Test Coverage:
 - Physical Memory Protection (PMP) registers (38 tests)
 
 Running Compliance Tests:
-```bash
+```shell
 make compliance
 # Expected duration: 10-15 minutes
 # Results saved to: results/report.html
@@ -129,7 +131,7 @@ These warnings are expected and harmless. RISC-V programs use stack addresses no
 ## Building and Testing
 
 Available Makefile targets:
-```bash
+```shell
 # Run ChiselTest unit tests
 make test
 

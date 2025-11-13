@@ -1,10 +1,13 @@
 # RISCOF Compliance Testing for MyCPU
 
-This directory contains RISC-V compliance test infrastructure using the RISCOF (RISC-V Compliance Framework) for all MyCPU projects.
+This directory contains the RISC-V compliance test infrastructure using RISCOF (RISC-V Compliance Framework).
+The framework provides automated verification of all MyCPU processor implementations against official RISC-V architectural tests.
 
 ## Overview
 
-RISCOF automates verification of RISC-V implementations against the official RISC-V architectural tests. This ensures MyCPU implementations correctly execute the RV32I instruction set according to the RISC-V specification.
+RISCOF automates the verification process by comparing processor execution against the official RISC-V architectural test suite.
+This validation ensures MyCPU implementations correctly execute the RV32I instruction set according to the RISC-V specification.
+The framework uses rv32emu as the golden reference model for signature comparison.
 
 ## Directory Structure
 
@@ -34,12 +37,12 @@ riscof-tests/
 ## Prerequisites
 
 1. Install RISCOF:
-   ```bash
+   ```shell
    pip install riscof
    ```
 
 2. Ensure RISC-V toolchain is in PATH:
-   ```bash
+   ```shell
    riscv32-unknown-elf-gcc --version
    ```
 
@@ -47,15 +50,15 @@ riscof-tests/
 
 ## First-Time Setup
 
-The test infrastructure requires two external repositories:
-- `riscv-arch-test`: Official RISC-V compliance test suite
-- `rv32emu`: Reference implementation for signature comparison
+The test infrastructure depends on two external repositories that provide the test suite and reference implementation:
+- `riscv-arch-test` provides the official RISC-V compliance test suite
+- `rv32emu` serves as the reference implementation for signature comparison
 
-**Automated Setup (Recommended)**
+Automated Setup (Recommended)
 
-The setup happens automatically when you run compliance tests:
+The setup process executes automatically when you run compliance tests for the first time:
 
-```bash
+```shell
 cd riscof-tests
 ./run-compliance.sh 1-single-cycle
 # Will automatically clone required repositories if missing
@@ -63,7 +66,7 @@ cd riscof-tests
 
 Or run setup explicitly:
 
-```bash
+```shell
 cd riscof-tests
 ./setup.sh
 ```
@@ -74,30 +77,21 @@ The setup script will:
 - Verify test suite structure
 - Report status with colored output
 
-**Manual Setup (Alternative)**
+Manual Setup (Alternative)
 
-```bash
+```shell
 cd riscof-tests
-git clone --depth=1 https://github.com/riscv-non-isa/riscv-arch-test.git
-git clone --depth=1 https://github.com/sysprog21/rv32emu.git
+git clone --depth=1 https://github.com/riscv-non-isa/riscv-arch-test
+git clone --depth=1 https://github.com/sysprog21/rv32emu
 ```
 
 ## Usage
 
 ### Quick Start: Running Compliance Tests
 
-From the top-level directory (recommended):
+From individual project directories:
 
-```bash
-# From ca2025-lab3/
-make compliance-1  # Test 1-single-cycle (RV32I)
-make compliance-2  # Test 2-mmio-trap (RV32I + Zicsr)
-make compliance-3  # Test 3-pipeline (RV32I + Zicsr)
-```
-
-Or from individual project directories:
-
-```bash
+```shell
 cd 1-single-cycle
 make compliance    # Tests RV32I implementation
 
@@ -119,7 +113,7 @@ The `make compliance` target will:
 
 Test a specific MyCPU project directly:
 
-```bash
+```shell
 cd riscof-tests
 ./run-compliance.sh 1-single-cycle
 ./run-compliance.sh 2-mmio-trap
@@ -130,7 +124,7 @@ cd riscof-tests
 
 For more control over test execution:
 
-```bash
+```shell
 cd riscof-tests
 
 # Setup (first time only)
@@ -147,12 +141,12 @@ riscof run --config=config.ini \
 
 After running compliance tests, results are generated in `riscof_work/`:
 
-- **HTML Report**: `riscof_work/report.html` - Comprehensive test results with pass/fail status
-- **Signature Files**: `riscof_work/rv32i_m/I/src/*/` - Memory dumps from CPU execution
-- **Comparison**: Each test's DUT signature compared against rv32emu reference
-- **Logs**: Detailed execution logs for debugging failures
+- HTML Report: `riscof_work/report.html` - Comprehensive test results with pass/fail status
+- Signature Files: `riscof_work/rv32i_m/I/src/*/` - Memory dumps from CPU execution
+- Comparison: Each test's DUT signature compared against rv32emu reference
+- Logs: Detailed execution logs for debugging failures
 
-**Example output:**
+Example output:
 ```
 Running RISC-V compliance tests for 1-single-cycle (RV32I)...
 
@@ -169,7 +163,7 @@ Report available at: ../riscof-tests/riscof_work/report.html
 
 Uses [rv32emu](https://github.com/sysprog21/rv32emu) as the golden reference implementation. rv32emu is a fast, feature-complete RV32IMAFDCZicsr_Zifencei emulator.
 
-**rv32emu execution:** Real emulator runs with `-q` (quiet) and `-a` (signature output) flags, 30-second timeout per test.
+rv32emu execution: Real emulator runs with `-q` (quiet) and `-a` (signature output) flags, 30-second timeout per test.
 
 ### DUT (Device Under Test): MyCPU
 
@@ -177,11 +171,11 @@ All three MyCPU projects use real CPU simulation via ChiselTest:
 
 | Project | ISA Support | Description |
 |---------|-------------|-------------|
-| **1-single-cycle** | RV32I | Single-cycle implementation |
-| **2-mmio-trap** | RV32I + Zicsr | MMIO and interrupt support |
-| **3-pipeline** | RV32I + Zicsr | Pipelined implementation |
+| 1-single-cycle | RV32I | Single-cycle implementation |
+| 2-mmio-trap | RV32I + Zicsr | MMIO and interrupt support |
+| 3-pipeline | RV32I + Zicsr | Pipelined implementation |
 
-**MyCPU execution:**
+MyCPU execution:
 - ChiselTest simulates actual CPU hardware
 - 100,000 cycle simulation per test
 - Memory debug interface extracts signature region
@@ -189,22 +183,24 @@ All three MyCPU projects use real CPU simulation via ChiselTest:
 
 ### Test Flow
 
-1. **Compilation**: RISCOF compiles test from riscv-arch-test suite using RISC-V GCC
-2. **Reference Execution**: rv32emu runs compiled ELF and generates reference signature
-3. **DUT Execution**: MyCPU (via ChiselTest) simulates CPU with same ELF binary
-4. **Signature Extraction**: Memory debug interface reads signature region (e.g., 0x3000-0x3940)
-5. **Comparison**: RISCOF compares DUT signature against rv32emu reference
-6. **Report Generation**: HTML report shows pass/fail for each test
+The verification process follows a six-stage pipeline:
+
+1. Compilation: RISCOF compiles each test from the riscv-arch-test suite using RISC-V GCC toolchain
+2. Reference Execution: rv32emu executes the compiled ELF binary and generates the golden reference signature
+3. DUT Execution: MyCPU simulates the same ELF binary through ChiselTest for 100,000 cycles
+4. Signature Extraction: The memory debug interface reads the signature region based on ELF symbols (e.g., 0x3000-0x3940)
+5. Comparison: RISCOF performs byte-by-byte comparison of DUT signature against rv32emu reference
+6. Report Generation: The framework produces an HTML report showing pass/fail status for each test with detailed logs
 
 ## ISA Coverage
 
 ### 1-single-cycle
-- **ISA**: `RV32I` (base integer instructions only)
-- **Test Coverage**: 41 RV32I compliance tests
+- ISA: `RV32I` (base integer instructions only)
+- Test Coverage: 41 RV32I compliance tests
 
 ### 2-mmio-trap and 3-pipeline
-- **ISA**: `RV32I + Zicsr` (base integer + CSR instructions)
-- **Test Coverage**: 41 RV32I + Zicsr compliance tests
+- ISA: `RV32I + Zicsr` (base integer + CSR instructions)
+- Test Coverage: 41 RV32I + Zicsr compliance tests
 
 Supported instruction categories:
 - Integer computational instructions (ADD, SUB, AND, OR, XOR, etc.)
@@ -225,7 +221,7 @@ Supported instruction categories:
 ## Troubleshooting
 
 ### riscof not found
-```bash
+```shell
 pip install riscof
 ```
 
@@ -240,27 +236,15 @@ Check that:
 
 ### Signature mismatch
 Enable VCD waveform generation to debug:
-```bash
+```shell
 WRITE_VCD=1 ./run-compliance.sh 1-single-cycle
 ```
-
-### rv32emu configuration
-**Status**: ✅ **WORKING** - rv32emu properly configured for RISCOF compliance testing.
-
-**Configuration**: rv32emu built with:
-- `ENABLE_ARCH_TEST=1` - Enables arch-test mode with `tohost`/`fromhost` detection
-- `ENABLE_FULL4G=1` - Full 4GB memory address space
-- `ENABLE_ELF_LOADER=1` - ELF file loading support
-
-**Performance**: Each compliance test completes in <1 second, generating valid reference signatures for comparison with MyCPU DUT.
-
-**Verification**: rv32emu successfully detects `tohost` writes and exits cleanly, producing 592-line signature files with real execution data.
 
 ## Integration with Main Projects
 
 Each MyCPU project includes a `make compliance` target for easy testing:
 
-```bash
+```shell
 # Test 1-single-cycle (RV32I)
 cd 1-single-cycle
 make compliance
@@ -282,12 +266,12 @@ The Makefile targets automatically:
 
 ## Performance
 
-**Typical execution times:**
+Typical execution times:
 - Single test: ~10 seconds (includes JVM/sbt startup)
 - Full 41-test suite: ~7 minutes
 - Bottleneck: sbt invocation per test
 
-**Optimization considerations:**
+Optimization considerations:
 - Each test requires separate sbt invocation
 - JVM startup overhead dominates short tests
 - Parallel execution not currently implemented
@@ -296,7 +280,7 @@ The Makefile targets automatically:
 
 From the top-level directory:
 
-```bash
+```shell
 # Clean build artifacts from all projects
 make clean
 
@@ -312,7 +296,7 @@ The `make distclean` target removes:
 - Verilator generated files
 - sbt output logs from test runs
 
-**Note**: Source files and configuration are preserved.
+Note: Source files and configuration are preserved.
 
 ## References
 

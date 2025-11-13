@@ -1,7 +1,8 @@
 # RISC-V CPU with MMIO Peripherals and Trap Handling
 
-An extended single-cycle RISC-V processor implementation in Chisel that adds memory-mapped I/O peripherals (Timer, UART) and comprehensive trap handling through Control and Status Registers (CSR) and Core-Local Interrupt Controller (CLINT).
-This builds upon the basic single-cycle design by introducing privileged architecture features and peripheral interfacing necessary for embedded systems and operating system support.
+This project implements an extended single-cycle RISC-V processor in Chisel that adds memory-mapped I/O peripherals and comprehensive trap handling capabilities.
+The implementation builds upon the basic single-cycle design by introducing privileged architecture features through Control and Status Registers (CSR) and Core-Local Interrupt Controller (CLINT).
+These extensions provide peripheral interfacing and interrupt handling necessary for embedded systems and operating system support.
 
 ## Architecture Overview
 
