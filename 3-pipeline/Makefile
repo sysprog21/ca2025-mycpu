@@ -1,6 +1,12 @@
 # MyCPU is freely redistributable under the MIT License. See the file
 # "LICENSE" for information on usage and redistribution of this file.
 
+# Include common build utilities
+include ../common/build.mk
+
+# Default target: run tests
+.DEFAULT_GOAL := test
+
 SIM_TIME ?= 1000000
 SIM_VCD ?= trace.vcd
 
@@ -19,7 +25,8 @@ indent:
 	clang-format -i verilog/verilator/*.cpp
 	clang-format -i csrc/*.[ch]
 
-compliance:
+compliance: check-riscof
+	@echo "Running RISCOF compliance tests for 3-pipeline (RV32I + Zicsr)..."
 	@cd ../tests && RISCOF_WORK=riscof_work_3pl ./run-compliance.sh 3-pipeline
 	@echo ""
 	@echo "Copying results to results/ directory..."

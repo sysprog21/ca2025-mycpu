@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: MIT
 # Top-level Makefile for MyCPU projects
 
+# Include common build utilities
+include common/build.mk
+
 # Project directories
 PROJECTS := 1-single-cycle 2-mmio-trap 3-pipeline
 ALL_MODULES := common $(PROJECTS)

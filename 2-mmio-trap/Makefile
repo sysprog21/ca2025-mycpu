@@ -2,6 +2,12 @@
 # LICENSE" for information on usage and redistribution of this file.
 #
 
+# Include common build utilities
+include ../common/build.mk
+
+# Default target: run tests
+.DEFAULT_GOAL := test
+
 SIM_TIME ?= 1000000
 SIM_VCD ?= trace.vcd
 WRITE_VCD ?= 1
@@ -43,7 +49,8 @@ indent:
 	clang-format -i verilog/verilator/*.cpp
 	clang-format -i csrc/*.[ch]
 
-compliance:
+compliance: check-riscof
+	@echo "Running RISCOF compliance tests for 2-mmio-trap (RV32I + Zicsr)..."
 	@cd ../tests && RISCOF_WORK=riscof_work_2mt ./run-compliance.sh 2-mmio-trap
 	@echo ""
 	@echo "Copying results to results/ directory..."

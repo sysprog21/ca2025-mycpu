@@ -78,33 +78,65 @@ The comprehensive test suite validates pipeline register correctness, hazard sce
 
 ## Build and Test Workflow
 
-### Requirements
+### Dependencies
 
-The build system requires SBT 1.9.7+ for Scala project management and dependency resolution.
-Chisel hardware generation needs version 3.6.1 with the legacy FIRRTL 1.6.0 compiler for Verilog output.
-Simulation depends on Verilator 5.042+ which provides cycle-accurate C++ simulation with VCD waveform support.
-Test program compilation optionally uses RISC-V GNU toolchain (default path: `$HOME/riscv/toolchain/bin/` or set `CROSS_COMPILE`).
+**Core Requirements:**
+- **SBT** 1.9.7+ - Scala build tool
+- **Chisel** 3.6.1 with legacy FIRRTL compiler 1.6.0
+- **Verilator** 5.042+ - HDL simulator for Verilog
+- **RISC-V Toolchain** (optional) - For assembling C/asm test programs
+
+**For Compliance Testing:**
+- **RISCOF** 1.25.3+ - RISC-V Architectural Test Framework
+  ```bash
+  pip install riscof
+  # Verify installation
+  riscof --version
+  ```
+
+**Dependency Validation:**
+```bash
+make check-deps        # Validate all dependencies
+make check-riscof      # Check RISCOF only
+make check-toolchain   # Check RISC-V toolchain only
+make check-verilator   # Check Verilator only
+```
+
+> **Note**: Run `make check-deps` before starting work to verify all required tools are installed.
+
+### Build System Architecture
 
 The legacy FIRRTL compiler generates Verilog through the `ChiselStage.emitVerilog()` API.
 This approach compiles slower than CIRCT but eliminates the external firtool dependency.
 The toolchain selection enables builds on systems lacking pre-built CIRCT binaries such as macOS ARM64 and custom Linux distributions.
 
-### Targets
+### Repository-wide targets (from top-level directory)
 
-Repository-wide targets (execute from project root):
 ```shell
-make clean      # Remove build artifacts from all projects
-make distclean  # Deep clean: RISCOF work directories, sbt cache, Verilator outputs, compliance test files
+make help          # Display all available build targets and usage
+make check-deps    # Validate all dependencies (toolchain, verilator, riscof)
+make test-all      # Run ChiselTest suite for all three projects
+make clean         # Clean build artifacts from all projects
+make distclean     # Deep clean: remove RISCOF results and all generated files
 ```
 
-Per-project targets (execute from `0-minimal/`, `1-single-cycle/`, `2-mmio-trap/`, or `3-pipeline/`):
+### Per-project targets (run from project directories)
+
+Per-project targets (execute from `1-single-cycle/`, `2-mmio-trap/`, or `3-pipeline/`):
 ```shell
-make test       # Run ChiselTest suite (unit and integration tests)
-make verilator  # Generate Verilog via ChiselStage, compile Verilator C++ simulator with VCD tracing
-make sim        # Execute Verilator simulation (default: VCD enabled, output to trace.vcd)
-make indent     # Format Scala (scalafmt) and C++ (clang-format) sources
-make compliance # Run RISCOF architectural compliance tests (RV32I validation)
+make test       # Run ChiselTest suite
+make verilator  # Generate Verilog (via legacy FIRRTL compiler) and build Verilator simulator
+make sim        # Run Verilator simulation; generates waveforms in trace.vcd
+make indent     # Format Scala and C++ sources (scalafmt + clang-format)
+make clean      # Remove build artifacts
+make compliance # Run RISCOF compliance tests (validates RISCOF first)
 ```
+
+**Note on compliance testing:** The `make compliance` target automatically validates RISCOF installation before running tests. This provides immediate feedback if RISCOF is missing, rather than discovering it 10-15 minutes into the test run.
+
+The `make verilator` target performs two steps:
+1. Generate Verilog from Chisel using `sbt "runMain board.verilator.VerilogGenerator"`
+2. Compile the Verilator C++ simulator with VCD tracing support
 
 Simulation customization:
 ```shell
