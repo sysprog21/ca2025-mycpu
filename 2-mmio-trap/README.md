@@ -965,10 +965,10 @@ void setup_timer(uint32_t interval) {
 
 ```shell
 # Basic simulation with interrupt support
-make sim SIM_ARGS="-instruction ../../../src/main/resources/interrupt_test.asmbin"
+make sim SIM_ARGS="-instruction src/main/resources/irqtrap.asmbin"
 
 # Extended simulation for timer testing
-make sim SIM_TIME=1000000 SIM_ARGS="-instruction ../../../test_program.asmbin"
+make sim SIM_TIME=1000000 SIM_ARGS="-instruction src/main/resources/test_program.asmbin"
 ```
 
 ### VGA Display Demo
