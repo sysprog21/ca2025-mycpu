@@ -73,9 +73,12 @@ class MemoryAccess extends Module {
         // Hint: Replicate sign bit, then concatenate with byte
         InstructionsTypeL.lb -> MuxLookup(mem_address_index, Cat(Fill(24, data(31)), data(31, 24)))(
           Seq(
-            0.U -> ?,
-            1.U -> ?,
-            2.U -> ?
+            // Byte 0: data[7:0], sign-extend bit 7
+            0.U -> Cat(Fill(24, data(7)), data(7, 0)),
+            // Byte 1: data[15:8], sign-extend bit 15
+            1.U -> Cat(Fill(24, data(15)), data(15, 8)),
+            // Byte 2: data[23:16], sign-extend bit 23
+            2.U -> Cat(Fill(24, data(23)), data(23, 16))
           )
         ),
 
@@ -83,9 +86,12 @@ class MemoryAccess extends Module {
         // Hint: Fill upper bits with zero, then concatenate with byte
         InstructionsTypeL.lbu -> MuxLookup(mem_address_index, Cat(Fill(24, 0.U), data(31, 24)))(
           Seq(
-            0.U -> ?,
-            1.U -> ?,
-            2.U -> ?
+            // Byte 0: data[7:0], zero-extend
+            0.U -> Cat(Fill(24, 0.U), data(7, 0)),
+            // Byte 1: data[15:8], zero-extend
+            1.U -> Cat(Fill(24, 0.U), data(15, 8)),
+            // Byte 2: data[23:16], zero-extend
+            2.U -> Cat(Fill(24, 0.U), data(23, 16))
           )
         ),
 
@@ -93,16 +99,20 @@ class MemoryAccess extends Module {
         // Hint: Replicate sign bit, then concatenate with halfword
         InstructionsTypeL.lh -> Mux(
           mem_address_index === 0.U,
-          ?,
-          ?
+          // Lower Half (0): data[15:0], sign-extend bit 15
+          Cat(Fill(16, data(15)), data(15, 0)),
+          // Upper Half (2): data[31:16], sign-extend bit 31
+          Cat(Fill(16, data(31)), data(31, 16))
         ),
 
         // TODO: Complete LHU (zero-extend halfword)
         // Hint: Fill upper bits with zero, then concatenate with halfword
         InstructionsTypeL.lhu -> Mux(
           mem_address_index === 0.U,
-          ?,
-          ?
+          // Lower Half (0): data[15:0], zero-extend
+          Cat(Fill(16, 0.U), data(15, 0)),
+          // Upper Half (2): data[31:16], zero-extend
+          Cat(Fill(16, 0.U), data(31, 16))
         ),
 
         // LW: Load full word, no extension needed (completed example)
@@ -144,13 +154,13 @@ class MemoryAccess extends Module {
       // Hint:
       // 1. Enable single byte strobe at appropriate position
       // 2. Shift byte data to correct position based on address
-      io.memory_bundle.write_strobe(?) := true.B
-      io.memory_bundle.write_data := io.reg2_data(?) << (mem_address_index << ?)
+      io.memory_bundle.write_strobe(mem_address_index) := true.B
+      io.memory_bundle.write_data := io.reg2_data(7, 0) << (mem_address_index << 3)
 
     }.elsewhen(io.funct3 === InstructionsTypeS.sh) {
       // TODO: Complete store halfword logic
       // Hint: Check address to determine lower/upper halfword position
-      when(mem_address_index(?) === 0.U) {
+      when(mem_address_index(1) === 0.U) {
         // Lower halfword (bytes 0-1)
         // TODO: Enable strobes for bytes 0 and 1, no shifting needed
         for (i <- 0 until Parameters.WordSize / 2) {
