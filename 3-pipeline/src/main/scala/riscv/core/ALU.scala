@@ -60,12 +60,12 @@ class ALU extends Module {
     is(ALUFunctions.sll) {
       // TODO: Implement logical left shift (Shift Left Logical)
       // Hint: Use shift left operator, only use low 5 bits of second operand
-      io.result := ?
+      io.result := io.op1 << io.op2(4, 0)
     }
     is(ALUFunctions.srl) {
       // TODO: Implement logical right shift (Shift Right Logical)
       // Hint: Use shift right operator, fill high bits with 0, only use low 5 bits
-      io.result := ?
+      io.result := io.op1 >> io.op2(4, 0)
     }
     is(ALUFunctions.sra) {
       // TODO: Implement arithmetic right shift (Shift Right Arithmetic)
@@ -73,7 +73,7 @@ class ALU extends Module {
       //   1. Convert operand to signed type
       //   2. Perform arithmetic right shift
       //   3. Convert back to unsigned type
-      io.result := ?
+      io.result := (io.op1.asSInt >> io.op2(4, 0)).asUInt
     }
 
     // Comparison Operations
@@ -82,28 +82,28 @@ class ALU extends Module {
       // TODO: Implement signed comparison (Set Less Than)
       // Hint: Convert both operands to signed type then compare
       //   If op1 < op2 (signed), result is 1, otherwise 0
-      io.result := ?
+      io.result := Mux(io.op1.asSInt < io.op2.asSInt, 1.U, 0.U)
     }
     is(ALUFunctions.sltu) {
       // TODO: Implement unsigned comparison (Set Less Than Unsigned)
       // Hint: Directly compare unsigned values
       //   If op1 < op2 (unsigned), result is 1, otherwise 0
-      io.result := ?
+      io.result := Mux(io.op1 < io.op2, 1.U, 0.U)
     }
 
     // Logical Operations
     //
     is(ALUFunctions.xor) {
       // TODO: Implement XOR operation
-      io.result := ?
+      io.result := io.op1 ^ io.op2
     }
     is(ALUFunctions.or) {
       // TODO: Implement OR operation
-      io.result := ?
+      io.result := io.op1 | io.op2
     }
     is(ALUFunctions.and) {
       // TODO: Implement AND operation
-      io.result := ?
+      io.result := io.op1 & io.op2
     }
   }
 }
