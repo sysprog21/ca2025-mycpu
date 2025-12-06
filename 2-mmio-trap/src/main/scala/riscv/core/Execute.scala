@@ -10,25 +10,16 @@ import chisel3.util.MuxLookup
 import riscv.Parameters
 
 /**
- * Execute: ALU operations, CSR access, and branch resolution for RV32I+Zicsr
+ * Execute: ALU operations and branch resolution for RV32I
  *
  * Pipeline Stage: EX (Execute)
  *
  * Key Responsibilities:
  * - Select ALU operands from register data, PC, or immediate values
  * - Perform arithmetic and logical operations via ALU submodule
- * - Execute CSR read-modify-write operations (CSRRW, CSRRS, CSRRC variants)
  * - Evaluate branch conditions for all six RV32I branch types
  * - Calculate branch and jump target addresses
  * - Generate control signals for instruction fetch (jump flag and address)
- *
- * CSR Instruction Handling:
- * - CSRRW: Write rs1/zimm to CSR, read old value to rd
- * - CSRRS: Set bits in CSR using rs1/zimm, read old value to rd
- * - CSRRC: Clear bits in CSR using rs1/zimm, read old value to rd
- * - CSR writes occur in parallel with normal ALU operations
- * - CSR read data comes from CSR module (csr_reg_read_data input)
- * - CSR write data computed here (csr_reg_write_data output)
  *
  * Control Flow Handling:
  * - Branch (B-type): Compare rs1 and rs2, compute PC + immediate if taken
@@ -37,19 +28,18 @@ import riscv.Parameters
  *   - BLTU/BGEU: Unsigned comparison using .asUInt
  * - JAL (J-type): Unconditional PC-relative jump, save PC+4 to rd
  * - JALR (I-type): Indirect jump to (rs1 + immediate) & ~1, save PC+4 to rd
- * - MRET: Return from trap, jump to mepc (handled by CLINT)
  *
  * ALU Operand Selection:
  * - Operand 1: Register (rs1) or PC (for branches, JAL, AUIPC)
  * - Operand 2: Register (rs2) or immediate (for I-type, S-type, U-type)
  *
  * Interface:
- * - Inputs: instruction, PC, register values, immediate, CSR read data
- * - Outputs: ALU result, CSR write data, jump flag, jump address
+ * - Inputs: instruction, PC, register values, immediate, operand source selects
+ * - Outputs: ALU result (for MEM stage), jump flag, jump address (for IF stage)
  *
  * Branch Penalty:
  * - Taken branches/jumps cause 1-cycle penalty (IF must restart)
- * - Interrupts cause 1-cycle penalty to vector to handler
+ * - Not-taken branches proceed without penalty
  */
 class Execute extends Module {
   val io = IO(new Bundle {
@@ -60,17 +50,16 @@ class Execute extends Module {
     val immediate           = Input(UInt(Parameters.DataWidth))
     val aluop1_source       = Input(UInt(1.W))
     val aluop2_source       = Input(UInt(1.W))
-    val csr_reg_read_data   = Input(UInt(Parameters.DataWidth))
 
-    val mem_alu_result     = Output(UInt(Parameters.DataWidth))
-    val csr_reg_write_data = Output(UInt(Parameters.DataWidth))
-    val if_jump_flag       = Output(Bool())
-    val if_jump_address    = Output(UInt(Parameters.DataWidth))
+    val mem_alu_result  = Output(UInt(Parameters.DataWidth))
+    val if_jump_flag    = Output(Bool())
+    val if_jump_address = Output(UInt(Parameters.DataWidth))
   })
 
   // Decode instruction fields
   val opcode = io.instruction(6, 0)
   val funct3 = io.instruction(14, 12)
+  val funct7 = io.instruction(31, 25)
 
   // Instantiate ALU and control logic
   val alu      = Module(new ALU)
@@ -78,7 +67,7 @@ class Execute extends Module {
 
   alu_ctrl.io.opcode := opcode
   alu_ctrl.io.funct3 := funct3
-  alu_ctrl.io.funct7 := io.instruction(31, 25)
+  alu_ctrl.io.funct7 := funct7
 
   // Select ALU operands based on instruction type
   alu.io.func := alu_ctrl.io.alu_funct
@@ -88,21 +77,6 @@ class Execute extends Module {
   alu.io.op2 := aluOp2
 
   io.mem_alu_result := alu.io.result
-
-  // CSR write data: implements read-modify-write semantics for RISC-V CSR instructions
-  val csrSourceImmediate = Cat(0.U((Parameters.DataBits - 5).W), io.instruction(19, 15))
-  val csrSource          = Mux(funct3(2), csrSourceImmediate, io.reg1_data)
-  val csrResult = MuxLookup(funct3, csrSource)(
-    Seq(
-      InstructionsTypeCSR.csrrw  -> csrSource,
-      InstructionsTypeCSR.csrrwi -> csrSource,
-      InstructionsTypeCSR.csrrs  -> (io.csr_reg_read_data | csrSource),
-      InstructionsTypeCSR.csrrsi -> (io.csr_reg_read_data | csrSource),
-      InstructionsTypeCSR.csrrc  -> (io.csr_reg_read_data & (~csrSource).asUInt),
-      InstructionsTypeCSR.csrrci -> (io.csr_reg_read_data & (~csrSource).asUInt)
-    )
-  )
-  io.csr_reg_write_data := csrResult
 
   // ============================================================
   // [CA25: Exercise 4] Branch Comparison Logic
@@ -117,16 +91,16 @@ class Execute extends Module {
     Seq(
       // TODO: Implement six branch conditions
       // Hint: Compare two register data values based on branch type
-      InstructionsTypeB.beq  -> ?,
-      InstructionsTypeB.bne  -> ?,
+      InstructionsTypeB.beq  -> (io.reg1_data === io.reg2_data),
+      InstructionsTypeB.bne  -> (io.reg1_data =/= io.reg2_data),
 
       // Signed comparison (need conversion to signed type)
-      InstructionsTypeB.blt  -> ?,
-      InstructionsTypeB.bge  -> ?,
+      InstructionsTypeB.blt  -> (io.reg1_data.asSInt < io.reg2_data.asSInt),
+      InstructionsTypeB.bge  -> (io.reg1_data.asSInt >= io.reg2_data.asSInt),
 
       // Unsigned comparison
-      InstructionsTypeB.bltu -> ?,
-      InstructionsTypeB.bgeu -> ?
+      InstructionsTypeB.bltu -> (io.reg1_data < io.reg2_data),
+      InstructionsTypeB.bgeu -> (io.reg1_data >= io.reg2_data)
     )
   )
   val isBranch = opcode === InstructionTypes.Branch
@@ -144,20 +118,24 @@ class Execute extends Module {
   // - JALR: (rs1 + immediate) & ~1 (register base, clear LSB for alignment)
   //
   // TODO: Complete the following address calculations
-  val branchTarget = ?
+  val branchTarget = io.instruction_address + io.immediate
 
   val jalTarget    = branchTarget  // JAL and Branch use same calculation method
 
   // JALR address calculation:
   //   1. Add register value and immediate
   //   2. Clear LSB (2-byte alignment)
-  val jalrSum      = ?
+  val jalrSum      = io.reg1_data + io.immediate
 
   // TODO: Clear LSB using bit concatenation
   // Hint: Extract upper bits and append zero
-  val jalrTarget   = ?
+  val jalrTarget   = Cat(jalrSum(31, 1), 0.U(1.W))
 
   val branchTaken = isBranch && branchCondition
-  io.if_jump_flag    := branchTaken || isJal || isJalr
-  io.if_jump_address := Mux(isJalr, jalrTarget, Mux(isJal, jalTarget, branchTarget))
+  io.if_jump_flag := branchTaken || isJal || isJalr
+  io.if_jump_address := Mux(
+    isJalr,
+    jalrTarget,
+    Mux(isJal, jalTarget, branchTarget)
+  )
 }
