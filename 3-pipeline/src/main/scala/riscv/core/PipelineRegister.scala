@@ -14,19 +14,21 @@ class PipelineRegister(width: Int = Parameters.DataBits, defaultValue: UInt = 0.
     val in    = Input(UInt(width.W))
     val out   = Output(UInt(width.W))
   })
-  val myreg = RegInit(UInt(width.W), defaultValue)
-  val out   = RegInit(UInt(width.W), defaultValue)
+  val reg = RegInit(UInt(width.W), defaultValue)
+
   when(io.flush) {
-    out   := defaultValue
-    myreg := defaultValue
+  // Flush : Clear register contents (Highest Priority)
+    reg := defaultValue
   }
-    .elsewhen(io.stall) {
-      out := myreg
-    }
-    .otherwise {
-      myreg := io.in
-      out   := io.in
-    }
-  io.out := out // 在最后一步才给io.out赋值，是为了防止出现组合逻辑环路导致sbt "testOnly riscv.ThreeStageCPUTest"无法通过（sbt "testOnly riscv.PipelineRegisterTest"可以通过）
-  // 踩了很多次坑猜测出来的，可能是因为如果在前面的条件判断中就给io.out赋值，硬件就不会理会后面代码对io.out的再次赋值
+  .elsewhen(io.stall) {
+  // Stall : Freeze register contents
+    reg := reg
+  }
+  .otherwise {
+  // Normal action: Update register contents with new input
+    reg := io.in
+  }
+  // Connect register to output.
+  // Being driven by a register breaks the combinational timing path.
+  io.out := reg
 }
