@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import logging
+import threading
 
 import riscof.utils as utils
 from riscof.pluginTemplate import pluginTemplate
@@ -158,9 +159,9 @@ class mycpu(pluginTemplate):
         batch_log = os.path.join(self.work_dir, 'batch_test.log')
 
         # Run all tests with real-time progress feedback
-        cmd = f'cd {parent_dir} && timeout 3600 sbt --batch "project {sbt_project_name}" "testOnly riscv.compliance.ComplianceTest" 2>&1'
+        cmd = f'cd {parent_dir} && sbt --batch "project {sbt_project_name}" "testOnly riscv.compliance.ComplianceTest" 2>&1'
         logger.debug(f'Running batch test: {cmd}')
-
+        timeout_sec = 3600
         try:
             import re
             test_counter = 0
@@ -168,25 +169,36 @@ class mycpu(pluginTemplate):
             # Stream SBT output with progress indicators
             proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
-            with open(batch_log, 'w') as log_file:
-                for line in proc.stdout:
-                    log_file.write(line)  # Save to log
+            def timeout_handler():
+                logger.error(f"Simulation timed out after {timeout_sec} seconds! Killing process...")
+                proc.terminate()
+                proc.kill()
+            
+            timer = threading.Timer(timeout_sec, timeout_handler)
+            timer.start()
 
-                    # Detect test execution and show progress
-                    # Match ScalaTest output: "- should pass test <testname>"
-                    test_match = re.search(r'should pass test (.+?)[\s\*]', line)
-                    if test_match:
-                        test_counter += 1
-                        test_name = test_match.group(1)
-                        logger.info(f'[{test_counter}/{len(test_metadata)}] Running: {test_name}')
+            try:
+                with open(batch_log, 'w') as log_file:
+                    for line in proc.stdout:
+                        log_file.write(line)  # Save to log
 
-                    # Show compilation progress
-                    if '[info] Compiling' in line:
-                        logger.info('Compiling test suite...')
+                        # Detect test execution and show progress
+                        # Match ScalaTest output: "- should pass test <testname>"
+                        test_match = re.search(r'should pass test (.+?)[\s\*]', line)
+                        if test_match:
+                            test_counter += 1
+                            test_name = test_match.group(1)
+                            logger.info(f'[{test_counter}/{len(test_metadata)}] Running: {test_name}')
 
-                    # Show errors immediately
-                    if '[error]' in line or 'FAILED' in line:
-                        logger.warning(line.strip())
+                        # Show compilation progress
+                        if '[info] Compiling' in line:
+                            logger.info('Compiling test suite...')
+
+                        # Show errors immediately
+                        if '[error]' in line or 'FAILED' in line:
+                            logger.warning(line.strip())
+            finally:
+                timer.cancel()
 
             proc.wait()
             logger.info(f'Batch test completed. Full log: {batch_log}')
