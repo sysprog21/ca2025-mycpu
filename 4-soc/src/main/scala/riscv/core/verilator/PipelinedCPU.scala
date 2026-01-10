@@ -2,13 +2,11 @@
 // MyCPU is freely redistributable under the MIT License. See the file
 // "LICENSE" for information on usage and redistribution of this file.
 
-package riscv.core
+package riscv.core.verilator
 
 import chisel3._
 import chisel3.util.MuxLookup
-import riscv.core.CPUBundle
-import riscv.core.CSR
-import riscv.core.RegisterFile
+import riscv.core._
 import riscv.Parameters
 
 /**

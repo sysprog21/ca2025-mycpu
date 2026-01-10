@@ -53,7 +53,7 @@ class IF2ID extends Module {
   instruction.io.flush  := io.flush
   io.output_instruction := instruction.io.out
 
-  val instruction_address = Module(new PipelineRegister(defaultValue = ProgramCounter.EntryAddress))
+  val instruction_address = Module(new PipelineRegister(defaultValue = Parameters.EntryAddress))
   instruction_address.io.in     := io.instruction_address
   instruction_address.io.stall  := io.stall
   instruction_address.io.flush  := io.flush
