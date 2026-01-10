@@ -2,11 +2,12 @@
 // MyCPU is freely redistributable under the MIT License. See the file
 // "LICENSE" for information on usage and redistribution of this file.
 
-package riscv.core
+package riscv.core.verilator
 
 import bus.AXI4LiteChannels
 import bus.AXI4LiteMasterBundle
 import chisel3._
+import riscv.core.BusBundle
 import riscv.Parameters
 
 class CPUBundle extends Bundle {
