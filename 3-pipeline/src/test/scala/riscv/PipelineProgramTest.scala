@@ -131,6 +131,11 @@ class PipelineProgramTest extends AnyFlatSpec with ChiselScalatestTester {
         c.clock.step()
         c.io.mem_debug_read_data.expect(20.U, "Multi-RAW Branch: mem[0x34] should be 20")
 
+        // Section 11: False Stall Prevention
+        c.io.mem_debug_read_address.poke(0x38.U)
+        c.clock.step()
+        c.io.mem_debug_read_data.expect(3.U, "False Stall: mem[0x38] should be 3")
+
         // Validate cycle count (s0 register = x8)
         c.io.regs_debug_read_address.poke(8.U)
         c.clock.step()

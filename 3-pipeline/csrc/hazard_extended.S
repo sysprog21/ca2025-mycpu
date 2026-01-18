@@ -102,6 +102,20 @@ skip2:
 skip2_end:
   sw t1, 0x34(zero)       # mem[0x34] = 20
 
+  # ===== Section 11: False Stall  =====
+  # Test Control hazard that should not cause stalls
+    # Make a5 a valid base address (reuse sp=0x1000 from Section 2)
+  addi a5, sp, 0
+  
+  csrr a2, cycle          # Read cycle CSR
+
+  lw  a6, (a5)       # Load from address in a5 (should not stall)
+  lw  a7, 16(a5)    # Load from address in a5+16 (should not stall)
+
+  csrr a3, cycle          # Read cycle CSR again
+  sub a3, a3, a2          # a3 = cycle difference (should be small, ≥1)
+  sw a3, 0x38(zero)       # mem[0x38] = cycle difference, should be 3 cycles
+
   # ===== End: Calculate cycle count =====
   csrr a1, cycle          # End cycle count
   sub s0, a1, a0          # s0 = total cycles (result register)

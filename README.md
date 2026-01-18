@@ -2,9 +2,9 @@
 
 > [!NOTE]
 > Code fragments marked `CA25: Exercise` are intentionally incomplete lab exercises.
-> Only [0-minimal](0-minimal/) is complete; other implementations require improvements marked with `CA25: Exercise` comments.
+> [0-minimal](0-minimal/) and [4-soc](4-soc/) are complete implementations; other projects require improvements marked with `CA25: Exercise` comments.
 
-This repository presents progressive RISC-V processor implementations in Chisel: single-cycle → interrupt-capable → pipelined.
+This repository presents progressive RISC-V processor implementations in Chisel: single-cycle → interrupt-capable → pipelined → SoC.
 Each lab increases architectural complexity while preserving common verification infrastructure.
 All designs target RV32I ISA and execute real C programs compiled by GNU toolchain.
 Verification combines ChiselTest unit tests with RISCOF compliance suite for architectural correctness.
@@ -34,6 +34,11 @@ The design ensures atomic state updates through CSR-based trap mechanisms.
 This project offers four pipeline variants: one 3-stage baseline and three 5-stage implementations.
 The variants demonstrate progressive optimization from stalling through forwarding to early branch resolution.
 These techniques improve CPI from ~2.5 to ~1.2 through systematic hazard mitigation.
+
+### `4-soc/`
+This project implements a complete System-on-Chip with AXI4-Lite bus interface.
+The design includes VGA output (640x480@72Hz), UART (115200 baud), and advanced branch prediction.
+Branch prediction combines BTB (32-entry), RAS (4-entry), and IndirectBTB (8-entry) for reduced control hazard penalties.
 
 ### `tests/`
 This directory contains the RISCOF compliance framework for architectural validation.
@@ -76,6 +81,20 @@ All variants implement data hazard detection, control hazard handling, and pipel
 The CSR and CLINT integration maintains correct trap handling despite pipelined execution complexity.
 The comprehensive test suite validates pipeline register correctness, hazard scenarios, and complete program execution.
 
+### [System-on-Chip](4-soc/)
+This project integrates the pipelined core with AXI4-Lite bus protocol for standardized peripheral access.
+
+| Component | Description | Features |
+|-----------|-------------|----------|
+| AXI4-Lite Bus | Master/slave state machines | Address decoder via bits[31:29], supports 8 slaves |
+| VGA Controller | 640x480@72Hz display | 64x64 framebuffer with 6x scaling, 16-color palette, double buffering |
+| UART Controller | Serial communication | 115200 baud, buffered TX/RX, interrupt support |
+| Branch Prediction | Multi-level prediction | BTB (32-entry) + RAS (4-entry) + IndirectBTB (8-entry) |
+
+The VGA peripheral uses dual-clock CDC for system and 31.5 MHz pixel clocks.
+The branch prediction hierarchy prioritizes RAS for returns, IndirectBTB for function pointers, and BTB as fallback.
+The MyCPU shell provides interactive debugging with memory inspection, CSR access, and performance counters.
+
 ## Build and Test Workflow
 
 ### Dependencies
@@ -115,14 +134,14 @@ The toolchain selection enables builds on systems lacking pre-built CIRCT binari
 ```shell
 make help          # Display all available build targets and usage
 make check-deps    # Validate all dependencies (toolchain, verilator, riscof)
-make test-all      # Run ChiselTest suite for all three projects
+make test-all      # Run ChiselTest suite for all four projects
 make clean         # Clean build artifacts from all projects
 make distclean     # Deep clean: remove RISCOF results and all generated files
 ```
 
 ### Per-project targets (run from project directories)
 
-Per-project targets (execute from `1-single-cycle/`, `2-mmio-trap/`, or `3-pipeline/`):
+Per-project targets (execute from `1-single-cycle/`, `2-mmio-trap/`, `3-pipeline/`, or `4-soc/`):
 ```shell
 make test       # Run ChiselTest suite
 make verilator  # Generate Verilog (via legacy FIRRTL compiler) and build Verilator simulator
@@ -130,6 +149,14 @@ make sim        # Run Verilator simulation; generates waveforms in trace.vcd
 make indent     # Format Scala and C++ sources (scalafmt + clang-format)
 make clean      # Remove build artifacts
 make compliance # Run RISCOF compliance tests (validates RISCOF first)
+```
+
+Additional targets for `4-soc/`:
+```shell
+make check-vga   # Run VGA test with nyancat demo (requires SDL2)
+make check-uart  # Run UART loopback and echo tests
+make shell       # Start interactive MyCPU shell
+make sim BINARY=csrc/nyancat.asmbin  # Run simulation with custom binary
 ```
 
 **Note on compliance testing:** The `make compliance` target automatically validates RISCOF installation before running tests. This provides immediate feedback if RISCOF is missing, rather than discovering it 10-15 minutes into the test run.
@@ -156,6 +183,10 @@ The recommended study sequence builds processor complexity progressively:
   ├─ FiveStageStall  → Classic pipeline with hazards
   ├─ FiveStageForward → Data forwarding optimization
   └─ FiveStageFinal  → Control hazard reduction
+4-soc        → Integrate with bus and peripherals
+  ├─ AXI4-Lite       → Standardized bus protocol
+  ├─ VGA/UART        → Peripheral integration
+  └─ Branch Prediction → Advanced control flow optimization
 ```
 
 The following critical source files contain comprehensive Scaladoc documentation:
