@@ -85,7 +85,7 @@ import riscv.ImplementationType
  *
  * @param implementation Pipeline implementation selector (default: FiveStageFinal)
  */
-class CPU(val implementation: Int = ImplementationType.FiveStageFinal) extends Module {
+class CPU(val implementation: Int = ImplementationType.FiveStageForward) extends Module {
   val io = IO(new CPUBundle)
   implementation match {
     case ImplementationType.ThreeStage =>

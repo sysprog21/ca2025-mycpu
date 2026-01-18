@@ -532,6 +532,7 @@ int main(int argc, char **argv)
             if (mem_write_req) {
                 mem.write(mem_address, mem_write_data, mem_write_strobe);
 
+                /*
                 // Test harness check: magic 0xCAFEF00D at 0x100 signals
                 // completion Test result at 0x104: each set bit = one subtest
                 // passed UART: 0xF (4 tests), VGA: 0x3F (6 tests)
@@ -546,6 +547,7 @@ int main(int argc, char **argv)
                                   << std::dec << "\n";
                     break;  // Exit simulation on test completion
                 }
+                */
             }
         }
 

@@ -10,7 +10,7 @@ test:
 
 verilator:
 	@if java -version >/dev/null 2>&1; then \
-		cd .. && PATH=$$HOME/.local/bin:$$PATH sbt "project soc" "runMain board.verilator.VerilogGenerator"; \
+		cd .. && PATH=$$HOME/.local/bin:$$PATH sbt "++2.12.17!" "project soc" "runMain board.verilator.VerilogGenerator"; \
 	else \
 		echo "⚠️  Java runtime not found; using existing generated Verilog in verilog/verilator"; \
 		if [ ! -f verilog/verilator/Top.v ]; then \

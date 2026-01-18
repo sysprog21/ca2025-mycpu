@@ -78,19 +78,19 @@ class MemoryAccess extends Module {
       Seq(
         // TODO: Complete LB (sign-extend byte)
         // Hint: Replicate sign bit, then concatenate with byte
-        InstructionsTypeL.lb  -> ?,
+        InstructionsTypeL.lb  -> Cat(Fill(24, byte(7)), byte),
 
         // TODO: Complete LBU (zero-extend byte)
         // Hint: Fill upper bits with zero, then concatenate with byte
-        InstructionsTypeL.lbu -> ?,
+        InstructionsTypeL.lbu -> Cat(0.U(24.W), byte),
 
         // TODO: Complete LH (sign-extend halfword)
         // Hint: Replicate sign bit, then concatenate with halfword
-        InstructionsTypeL.lh  -> ?,
+        InstructionsTypeL.lh  -> Cat(Fill(16, half(15)), half),
 
         // TODO: Complete LHU (zero-extend halfword)
         // Hint: Fill upper bits with zero, then concatenate with halfword
-        InstructionsTypeL.lhu -> ?,
+        InstructionsTypeL.lhu -> Cat(0.U(16.W), half),
 
         // LW: Load full word, no extension needed (completed example)
         InstructionsTypeL.lw  -> data
@@ -137,24 +137,24 @@ class MemoryAccess extends Module {
         // Hint:
         // 1. Enable single byte strobe at appropriate position
         // 2. Shift byte data to correct position based on address
-        writeStrobes(?) := true.B
-        writeData := data(?) << (mem_address_index << ?)
+        writeStrobes(mem_address_index) := true.B
+        writeData := data(7, 0) << (mem_address_index << 3)
       }
       is(InstructionsTypeS.sh) {
         // TODO: Complete store halfword logic
         // Hint: Check address to determine lower/upper halfword position
-        when(mem_address_index(?) === 0.U) {
+        when(mem_address_index(1) === 0.U) {
           // Lower halfword (bytes 0-1)
           // TODO: Enable strobes for lower two bytes, no shifting needed
-          writeStrobes(?) := true.B
-          writeStrobes(?) := true.B
-          writeData := data(?)
+          writeStrobes(0) := true.B
+          writeStrobes(1) := true.B
+          writeData := data(15, 0)
         }.otherwise {
           // Upper halfword (bytes 2-3)
           // TODO: Enable strobes for upper two bytes, apply appropriate shift
-          writeStrobes(?) := true.B
-          writeStrobes(?) := true.B
-          writeData := data(?) << ?
+          writeStrobes(2) := true.B
+          writeStrobes(3) := true.B
+          writeData := data(15, 0) << 16
         }
       }
       is(InstructionsTypeS.sw) {

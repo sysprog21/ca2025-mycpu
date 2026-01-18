@@ -1,7 +1,7 @@
-CROSS_COMPILE ?= $(HOME)/riscv/toolchain/bin/riscv-none-elf-
+CROSS_COMPILE ?= riscv64-unknown-elf-
 
-ASFLAGS = -march=rv32i_zicsr -mabi=ilp32
-CFLAGS = -O0 -Wall -march=rv32i_zicsr -mabi=ilp32
+ASFLAGS = -march=rv32i -mabi=ilp32
+CFLAGS = -O0 -Wall -march=rv32i -mabi=ilp32
 LDFLAGS = --oformat=elf32-littleriscv
 
 AS := $(CROSS_COMPILE)as
