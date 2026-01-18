@@ -137,6 +137,7 @@ class CPU extends Module {
   ctrl.io.rd_ex                  := id2ex.io.output_regs_write_address
   ctrl.io.memory_read_enable_mem := ex2mem.io.output_memory_read_enable
   ctrl.io.rd_mem                 := ex2mem.io.output_regs_write_address
+  ctrl.io.interrupt_assert := clint.io.id_interrupt_assert
 
   regs.io.write_enable  := mem2wb.io.output_regs_write_enable
   regs.io.write_address := mem2wb.io.output_regs_write_address

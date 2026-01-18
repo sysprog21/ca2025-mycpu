@@ -50,8 +50,9 @@ class Execute extends Module {
     val immediate           = Input(UInt(Parameters.DataWidth))
     val aluop1_source       = Input(UInt(1.W))
     val aluop2_source       = Input(UInt(1.W))
-
+    val csr_reg_read_data   = Input(UInt(Parameters.DataWidth))
     val mem_alu_result  = Output(UInt(Parameters.DataWidth))
+    val csr_reg_write_data = Output(UInt(Parameters.DataWidth))
     val if_jump_flag    = Output(Bool())
     val if_jump_address = Output(UInt(Parameters.DataWidth))
   })
@@ -77,6 +78,22 @@ class Execute extends Module {
   alu.io.op2 := aluOp2
 
   io.mem_alu_result := alu.io.result
+
+  val csrSourceImmediate = Cat(0.U((Parameters.DataBits - 5).W), io.instruction(19, 15))
+  val csrSource          = Mux(funct3(2), csrSourceImmediate, io.reg1_data)
+  
+  val csrResult = MuxLookup(funct3, csrSource)(
+    Seq(
+      InstructionsTypeCSR.csrrw  -> csrSource,
+      InstructionsTypeCSR.csrrwi -> csrSource,
+      InstructionsTypeCSR.csrrs  -> (io.csr_reg_read_data | csrSource),
+      InstructionsTypeCSR.csrrsi -> (io.csr_reg_read_data | csrSource),
+      InstructionsTypeCSR.csrrc  -> (io.csr_reg_read_data & (~csrSource).asUInt),
+      InstructionsTypeCSR.csrrci -> (io.csr_reg_read_data & (~csrSource).asUInt)
+    )
+  )
+  
+  io.csr_reg_write_data := csrResult
 
   // ============================================================
   // [CA25: Exercise 4] Branch Comparison Logic

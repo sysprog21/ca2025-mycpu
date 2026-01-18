@@ -89,7 +89,7 @@ class Forwarding extends Module {
 
   // EX stage rs1 forwarding: Resolve RAW hazards for first ALU operand
   // TODO: Complete rs1_ex forwarding logic
-  when(? && ? =/= 0.U) {
+  when(io.reg_write_enable_mem && io.rs1_ex === io.rd_mem && io.rd_mem =/= 0.U) {
     // Condition 1: MEM stage writes register
     // Condition 2: Register address match
     // Condition 3: Not x0 register
@@ -97,7 +97,7 @@ class Forwarding extends Module {
     // Priority 1: Forward from EX/MEM stage (1-cycle RAW hazard)
     // Most recent result takes precedence
     io.reg1_forward_ex := ForwardingType.ForwardFromMEM
-  }.elsewhen(? && ? =/= 0.U) {
+  }.elsewhen(io.reg_write_enable_wb && io.rs1_ex === io.rd_wb && io.rd_wb =/= 0.U) {
     // Condition 1: WB stage writes register
     // Condition 2: Register address match
     // Condition 3: Not x0 register
@@ -112,11 +112,11 @@ class Forwarding extends Module {
 
   // EX stage rs2 forwarding: Resolve RAW hazards for second ALU operand
   // TODO: Complete rs2_ex forwarding logic (similar to rs1)
-  when(? && ? && ? =/= 0.U) {
+  when(io.reg_write_enable_mem && io.rs2_ex === io.rd_mem && io.rd_mem =/= 0.U) {
     // Priority 1: Forward from EX/MEM stage
     // Example: ADD x1, x2, x3; SUB x4, x5, x1 (forward x1 to rs2)
     io.reg2_forward_ex := ForwardingType.ForwardFromMEM
-  }.elsewhen(? && ? && ? =/= 0.U) {
+  }.elsewhen(io.reg_write_enable_wb && io.rs2_ex === io.rd_wb && io.rd_wb =/= 0.U) {
     // Priority 2: Forward from MEM/WB stage
     io.reg2_forward_ex := ForwardingType.ForwardFromWB
   }.otherwise {
@@ -140,7 +140,7 @@ class Forwarding extends Module {
 
   // ID stage rs1 forwarding: Enable early branch operand resolution
   // TODO: Complete rs1_id forwarding logic
-  when(? && ? && ? =/= 0.U) {
+  when(io.reg_write_enable_mem && io.rs1_id === io.rd_mem && io.rd_mem =/= 0.U) {
     // Condition 1: MEM stage writes register
     // Condition 2: Register address match
     // Condition 3: Not x0 register
@@ -150,7 +150,7 @@ class Forwarding extends Module {
     // Without this: 2-cycle branch penalty
     // With this: 1-cycle branch penalty
     io.reg1_forward_id := ForwardingType.ForwardFromMEM
-  }.elsewhen(? && ? && ? =/= 0.U) {
+  }.elsewhen(io.reg_write_enable_wb && io.rs1_id === io.rd_wb && io.rd_wb =/= 0.U) {
     // Condition 1: WB stage writes register
     // Condition 2: Register address match
     // Condition 3: Not x0 register
@@ -164,12 +164,12 @@ class Forwarding extends Module {
 
   // ID stage rs2 forwarding: Enable early branch operand resolution
   // TODO: Complete rs2_id forwarding logic (similar to rs1_id)
-  when(? && ? && ? =/= 0.U) {
+  when(io.reg_write_enable_mem && io.rs2_id === io.rd_mem && io.rd_mem =/= 0.U) {
     // Forward from EX/MEM to ID for second branch operand
     // Critical for instructions like: BEQ x1, x2, label
     // where both operands may have pending writes
     io.reg2_forward_id := ForwardingType.ForwardFromMEM
-  }.elsewhen(? && ? && ? =/= 0.U) {
+  }.elsewhen(io.reg_write_enable_wb && io.rs2_id === io.rd_wb && io.rd_wb =/= 0.U) {
     // Forward from MEM/WB to ID
     io.reg2_forward_id := ForwardingType.ForwardFromWB
   }.otherwise {

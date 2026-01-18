@@ -54,13 +54,15 @@ import riscv.Parameters
 class Control extends Module {
   val io = IO(new Bundle {
     val jump_flag              = Input(Bool())                                     // id.io.if_jump_flag
-    val jump_instruction_id    = Input(Bool())                                     // id.io.ctrl_jump_instruction           //
+    val jump_instruction_id    = Input(Bool())                                     // id.io.ctrl_jump_instruction
     val rs1_id                 = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // id.io.regs_reg1_read_address
     val rs2_id                 = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // id.io.regs_reg2_read_address
     val memory_read_enable_ex  = Input(Bool())                                     // id2ex.io.output_memory_read_enable
     val rd_ex                  = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // id2ex.io.output_regs_write_address
-    val memory_read_enable_mem = Input(Bool())                                     // ex2mem.io.output_memory_read_enable   //
-    val rd_mem                 = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // ex2mem.io.output_regs_write_address   //
+    val memory_read_enable_mem = Input(Bool())                                     // ex2mem.io.output_memory_read_enable
+    val rd_mem                 = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // ex2mem.io.output_regs_write_address
+    
+    val interrupt_assert       = Input(Bool())                                     // clint.io.id_interrupt_assert
 
     val if_flush = Output(Bool())
     val id_flush = Output(Bool())
@@ -92,23 +94,27 @@ class Control extends Module {
   // - if_flush: Flush IF/ID register (discard wrong-path instruction)
 
   // Complex hazard detection for early branch resolution in ID stage
-  when(
+  when(io.interrupt_assert) {
+    // ============ Interrupt Hazard ============
+    // Interrupt taken - flush pipeline to vector to handler
+    io.if_flush := true.B
+    io.id_flush := true.B
+  }.elsewhen(
     // ============ Complex Hazard Detection Logic ============
     // This condition detects multiple hazard scenarios requiring stalls:
 
     // --- Condition 1: EX stage hazards (1-cycle dependencies) ---
-    // TODO: Complete hazard detection conditions
     // Need to detect:
     // 1. Jump instruction in ID stage
     // 2. OR Load instruction in EX stage
     // 3. AND destination register is not x0
     // 4. AND destination register conflicts with ID source registers
     //
-    ((?) && // Either:
+    ((io.jump_instruction_id || io.memory_read_enable_ex) && // Either:
       // - Jump in ID needs register value, OR
       // - Load in EX (load-use hazard)
-      ? =/= 0.U &&                                 // Destination is not x0
-      (?)) // Destination matches ID source
+      io.rd_ex =/= 0.U &&                                 // Destination is not x0
+      (io.rd_ex === io.rs1_id || io.rd_ex === io.rs2_id)) // Destination matches ID source
     //
     // Examples triggering Condition 1:
     // a) Jump dependency: ADD x1, x2, x3 [EX]; JALR x0, x1, 0 [ID] → stall
@@ -118,39 +124,36 @@ class Control extends Module {
       || // OR
 
         // --- Condition 2: MEM stage load with jump dependency (2-cycle) ---
-        // TODO: Complete MEM stage hazard detection
         // Need to detect:
         // 1. Jump instruction in ID stage
         // 2. Load instruction in MEM stage
         // 3. Destination register is not x0
         // 4. Destination register conflicts with ID source registers
         //
-        (? &&                              // Jump instruction in ID
-          ? &&                          // Load instruction in MEM
-          ? =/= 0.U &&                                  // Load destination not x0
-          (?)) // Load dest matches jump source
+        (io.jump_instruction_id &&                              // Jump instruction in ID
+          io.memory_read_enable_mem &&                          // Load instruction in MEM
+          io.rd_mem =/= 0.U &&                                  // Load destination not x0
+          (io.rd_mem === io.rs1_id || io.rd_mem === io.rs2_id)) // Load dest matches jump source
         //
         // Example triggering Condition 2:
         // LW x1, 0(x2) [MEM]; NOP [EX]; JALR x0, x1, 0 [ID]
         // Even with forwarding, load result needs extra cycle to reach ID stage
   ) {
     // Stall action: Insert bubble and freeze pipeline
-    // TODO: Which control signals need to be set to insert a bubble?
     // Hint:
     // - Flush ID/EX register (insert bubble)
     // - Freeze PC (don't fetch next instruction)
     // - Freeze IF/ID (hold current fetch result)
-    io.id_flush := ?
-    io.pc_stall := ?
-    io.if_stall := ?
+    io.id_flush := true.B
+    io.pc_stall := true.B
+    io.if_stall := true.B
 
   }.elsewhen(io.jump_flag) {
     // ============ Control Hazard (Branch Taken) ============
     // Branch resolved in ID stage - only 1 cycle penalty
     // Only flush IF stage (not ID) since branch resolved early
-    // TODO: Which stage needs to be flushed when branch is taken?
     // Hint: Branch resolved in ID stage, discard wrong-path instruction
-    io.if_flush := ?
+    io.if_flush := true.B
     // Note: No ID flush needed - branch already resolved in ID!
     // This is the key optimization: 1-cycle branch penalty vs 2-cycle
   }
@@ -162,31 +165,37 @@ class Control extends Module {
   // detection logic implemented above
   //
   // Q1: Why do we need to stall for load-use hazards?
-  // A: [Student answer here]
+  // A: Because the data from a Load instruction is retrieved from memory in the MEM stage. 
+  //    The immediately following instruction needs this data in the EX stage. 
+  //    Even with forwarding, the data cannot travel back in time from the end of MEM to the start of EX, so we must wait (stall) 1 cycle.
   // Hint: Consider data dependency and forwarding limitations
   //
   // Q2: What is the difference between "stall" and "flush" operations?
-  // A: [Student answer here]
+  // A: "Stall" freezes the PC and pipeline registers (keeping the instruction in the current stage) to delay execution.
+  //    "Flush" clears the pipeline register (setting it to NOP/zero), effectively discarding the instruction currently in that stage.
   // Hint: Compare their effects on pipeline registers and PC
   //
   // Q3: Why does jump instruction with register dependency need stall?
-  // A: [Student answer here]
+  // A: Indirect jumps (like JALR) calculate the target address in the ID stage using a register value. 
+  //    If the previous instruction is still calculating that register value in the EX stage (e.g., a Load or ALU op), the value is not ready in ID, requiring a stall.
   // Hint: When is jump target address available?
   //
   // Q4: In this design, why is branch penalty only 1 cycle instead of 2?
-  // A: [Student answer here]
+  // A: Because the branch decision (taken/not taken) and target address are resolved in the ID stage (or forwarded to ID). 
+  //    This means we only fetch one incorrect instruction (in the IF stage) before correcting the flow, so only one stage needs to be flushed.
   // Hint: Compare ID-stage vs EX-stage branch resolution
   //
   // Q5: What would happen if we removed the hazard detection logic entirely?
-  // A: [Student answer here]
+  // A: Data Hazards would occur (RAW), causing instructions to use outdated register values and produce wrong results.
+  //    Control Hazards would occur, causing the CPU to execute instructions following a branch that should have been skipped.
   // Hint: Consider data hazards and control flow correctness
   //
   // Q6: Complete the stall condition summary:
   // Stall is needed when:
-  // 1. ? (EX stage condition)
-  // 2. ? (MEM stage condition)
+  // 1. (ex_mem_read_enable) The instruction in EX is a Load AND its destination register matches source registers in ID (rs1 or rs2).
+  // 2. (JALR dependency) The instruction in ID is JALR AND its source register (rs1) matches the destination of the instruction in EX.
   //
   // Flush is needed when:
-  // 1. ? (Branch/Jump condition)
+  // 1. A Branch is taken OR a Jump (JAL/JALR) is taken (Control Hazard detected).
   //
 }
