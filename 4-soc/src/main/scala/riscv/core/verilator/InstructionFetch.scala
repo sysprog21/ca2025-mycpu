@@ -2,15 +2,17 @@
 // MyCPU is freely redistributable under the MIT License. See the file
 // "LICENSE" for information on usage and redistribution of this file.
 
-package riscv.core
+package riscv.core.verilator
 
 import chisel3._
 import chisel3.util.MuxCase
+import riscv.core.BranchTargetBuffer
+import riscv.core.IF2ID
+import riscv.core.IndirectBTB
+import riscv.core.Instructions
+import riscv.core.InstructionsNop
+import riscv.core.ReturnAddressStack
 import riscv.Parameters
-
-object ProgramCounter {
-  val EntryAddress = Parameters.EntryAddress
-}
 
 /**
  * Instruction Fetch Stage with Branch Prediction (BTB + RAS)
@@ -113,7 +115,7 @@ class InstructionFetch extends Module {
     val ibtb_update_rs1_hash = Input(UInt(8.W))
     val ibtb_update_target   = Input(UInt(Parameters.AddrWidth))
   })
-  val pc = RegInit(ProgramCounter.EntryAddress)
+  val pc = RegInit(Parameters.EntryAddress)
 
   // Branch Target Buffer for branch prediction (32 entries for better coverage)
   val btb = Module(new BranchTargetBuffer(entries = 32))
