@@ -30,7 +30,7 @@ class WriteBack extends Module {
   })
 
   // ============================================================
-  // [CA25: Exercise 12] WriteBack Source Selection with CSR Support
+  // [CA25: Exercise 8] WriteBack Source Selection with CSR Support
   // ============================================================
   // Hint: Select the appropriate write-back data source based on instruction type
   //

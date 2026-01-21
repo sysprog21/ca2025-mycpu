@@ -31,7 +31,7 @@ class MemoryAccess extends Module {
   io.wb_memory_read_data        := 0.U
 
   // ============================================================
-  // [CA25: Exercise 12] Load Data Extension - Sign and Zero Extension
+  // [CA25: Exercise 6] Load Data Extension - Sign and Zero Extension
   // ============================================================
   // Hint: Implement proper sign extension and zero extension for load operations
   //
@@ -110,7 +110,7 @@ class MemoryAccess extends Module {
       )
     )
   // ============================================================
-  // [CA25: Exercise 13] Store Data Alignment - Byte Strobes and Shifting
+  // [CA25: Exercise 7] Store Data Alignment - Byte Strobes and Shifting
   // ============================================================
   // Hint: Implement proper data alignment and byte strobes for store operations
   //

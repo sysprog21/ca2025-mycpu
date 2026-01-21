@@ -80,7 +80,7 @@ class CLINT extends Module {
   // val mpp = io.csr_bundle.mstatus(12, 11)  // Not used in M-mode only implementation
 
   // ============================================================
-  // [CA25: Exercise 13] Interrupt Entry - mstatus State Transition
+  // [CA25: Exercise 11] Interrupt Entry - mstatus State Transition
   // ============================================================
   // Hint: Implement mstatus register update during interrupt/trap entry
   //
@@ -165,7 +165,7 @@ class CLINT extends Module {
     )
     io.csr_bundle.direct_write_enable := true.B
     // ============================================================
-    // [CA25: Exercise 14] Trap Return (MRET) - mstatus State Restoration
+    // [CA25: Exercise 12] Trap Return (MRET) - mstatus State Restoration
     // ============================================================
     // Hint: Implement mstatus register update during trap return (MRET instruction)
     //

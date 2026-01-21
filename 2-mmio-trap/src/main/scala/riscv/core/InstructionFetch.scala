@@ -30,7 +30,7 @@ class InstructionFetch extends Module {
   val pc = RegInit(ProgramCounter.EntryAddress)
 
   // ============================================================
-  // [CA25: Exercise 15] PC Update Logic - Sequential vs Control Flow with Interrupts
+  // [CA25: Exercise 13] PC Update Logic - Sequential vs Control Flow with Interrupts
   // ============================================================
   // Hint: Implement program counter (PC) update logic for sequential execution,
   // control flow changes, and interrupt handling

@@ -110,7 +110,7 @@ class CSR extends Module {
   val mcause   = RegInit(UInt(Parameters.DataWidth), 0.U)
   val cycles   = RegInit(UInt(64.W), 0.U)
   // ============================================================
-  // [CA25: Exercise 10] CSR Register Lookup Table - CSR Address Mapping
+  // [CA25: Exercise 9] CSR Register Lookup Table - CSR Address Mapping
   // ============================================================
   // Hint: Map CSR addresses to corresponding registers
   //
@@ -153,7 +153,7 @@ class CSR extends Module {
   io.clint_access_bundle.mie     := mie
 
   // ============================================================
-  // [CA25: Exercise 11] CSR Write Priority Logic
+  // [CA25: Exercise 10] CSR Write Priority Logic
   // ============================================================
   // Hint: Handle priority when both CLINT and CPU write to CSRs simultaneously
   //
