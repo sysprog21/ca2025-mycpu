@@ -210,7 +210,7 @@ class InstructionDecode extends Module {
   val regWrite = (isLoad || isOpImm || isOp || isLui || isAuipc || isJal || isJalr || isCsr) && (rd =/= 0.U)
 
   // ============================================================
-  // [CA25: Exercise 6] Control Signal Generation
+  // [CA25: Exercise 2] Control Signal Generation
   // ============================================================
   // Hint: Generate correct control signals based on instruction type
   //
