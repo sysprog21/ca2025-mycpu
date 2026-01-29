@@ -56,7 +56,8 @@ class Control extends Module {
     val rs2_id                = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // id.io.regs_reg2_read_address
     val memory_read_enable_ex = Input(Bool())                                     // id2ex.io.output_memory_read_enable
     val rd_ex                 = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // id2ex.io.output_regs_write_address
-
+    val uses_rs1_id            = Input(Bool())                                     // true only if current ID instruction really reads rs1
+    val uses_rs2_id            = Input(Bool())                                     // true only if current ID instruction really reads rs2  
     val if_flush = Output(Bool())
     val id_flush = Output(Bool())
     val pc_stall = Output(Bool())
@@ -84,7 +85,7 @@ class Control extends Module {
     // Detection conditions (ALL must be true):
     io.memory_read_enable_ex &&                          // 1. EX stage has load instruction
       io.rd_ex =/= 0.U &&                                // 2. Load destination is not x0
-      (io.rd_ex === io.rs1_id || io.rd_ex === io.rs2_id) // 3. ID stage uses load destination
+      ((io.uses_rs1_id && (io.rd_ex === io.rs1_id)) || (io.uses_rs2_id && (io.rd_ex === io.rs2_id))) // 3. ID stage uses load destination
       //
       // Example triggering this hazard:
       //   LW  x1, 0(x2)  [EX stage: memory_read_enable_ex=1, rd_ex=x1]

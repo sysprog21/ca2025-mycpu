@@ -54,7 +54,9 @@ class Control extends Module {
     val rd_ex                = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // id2ex.io.output_regs_write_address
     val reg_write_enable_ex  = Input(Bool())                                     // id2ex.io.output_regs_write_enable
     val rd_mem               = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // ex2mem.io.output_regs_write_address
-    val reg_write_enable_mem = Input(Bool())                                     // ex2mem.io.output_regs_write_enable
+    val reg_write_enable_mem = Input(Bool())
+    val uses_rs1_id            = Input(Bool())                                     // true only if current ID instruction really reads rs1
+    val uses_rs2_id            = Input(Bool())                                     // true only if current ID instruction really reads rs2
 
     val if_flush = Output(Bool())
     val id_flush = Output(Bool())
@@ -83,12 +85,12 @@ class Control extends Module {
 
     // Check EX stage dependency (1-cycle old instruction):
     (io.reg_write_enable_ex &&                              // EX stage will write a register
-      (io.rd_ex === io.rs1_id || io.rd_ex === io.rs2_id) && // Destination matches ID source
+      ((io.uses_rs1_id && (io.rd_ex === io.rs1_id)) || (io.uses_rs2_id && (io.rd_ex === io.rs2_id))) && // Destination matches ID source
       io.rd_ex =/= 0.U)                                     // Not writing to x0 (always zero)
       ||
         // Check MEM stage dependency (2-cycle old instruction):
         (io.reg_write_enable_mem &&                               // MEM stage will write a register
-          (io.rd_mem === io.rs1_id || io.rd_mem === io.rs2_id) && // Destination matches ID source
+          ((io.uses_rs1_id && (io.rd_mem === io.rs1_id)) || (io.uses_rs2_id && (io.rd_mem === io.rs2_id))) && // Destination matches ID source
           io.rd_mem =/= 0.U)                                      // Not writing to x0
   ) {
     // Stall action: Insert bubble (NOP) and freeze earlier stages

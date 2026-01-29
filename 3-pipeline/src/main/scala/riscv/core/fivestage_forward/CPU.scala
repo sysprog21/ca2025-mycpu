@@ -59,6 +59,8 @@ class CPU extends Module {
   ctrl.io.rs2_id                := id.io.regs_reg2_read_address
   ctrl.io.memory_read_enable_ex := id2ex.io.output_memory_read_enable
   ctrl.io.rd_ex                 := id2ex.io.output_regs_write_address
+  ctrl.io.uses_rs2_id            := id.io.uses_rs2_id
+  ctrl.io.uses_rs1_id            := id.io.uses_rs1_id
 
   regs.io.write_enable  := mem2wb.io.output_regs_write_enable
   regs.io.write_address := mem2wb.io.output_regs_write_address

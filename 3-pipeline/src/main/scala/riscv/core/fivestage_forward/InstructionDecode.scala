@@ -138,6 +138,8 @@ class InstructionDecode extends Module {
     val ex_reg_write_address   = Output(UInt(Parameters.PhysicalRegisterAddrWidth))
     val ex_csr_address         = Output(UInt(Parameters.CSRRegisterAddrWidth))
     val ex_csr_write_enable    = Output(Bool())
+    val uses_rs1_id            = Output(Bool()) // tells Control/Forwarding whether rs1 is valid for this instruction
+    val uses_rs2_id            = Output(Bool()) // tells Control/Forwarding whether rs2 is valid for this instruction
   })
   val opcode = io.instruction(6, 0)
   val funct3 = io.instruction(14, 12)
@@ -145,9 +147,24 @@ class InstructionDecode extends Module {
   val rd     = io.instruction(11, 7)
   val rs1    = io.instruction(19, 15)
   val rs2    = io.instruction(24, 20)
+  val uses_rs2 = (opcode === InstructionTypes.RM) ||
+    (opcode === InstructionTypes.S) ||
+    (opcode === InstructionTypes.B)
 
-  io.regs_reg1_read_address := Mux(opcode === Instructions.lui, 0.U(Parameters.PhysicalRegisterAddrWidth), rs1)
-  io.regs_reg2_read_address := rs2
+  val uses_rs1 = !(opcode === Instructions.jal) &&
+    !(opcode === Instructions.lui) &&
+    !(opcode === Instructions.auipc) &&
+    !(opcode === Instructions.fence) &&
+    !(opcode === Instructions.csr &&
+      (funct3 === InstructionsTypeCSR.csrrwi ||
+        funct3 === InstructionsTypeCSR.csrrsi ||
+        funct3 === InstructionsTypeCSR.csrrci))
+
+  io.uses_rs2_id := uses_rs2
+  io.uses_rs1_id := uses_rs1
+
+  io.regs_reg1_read_address := Mux(uses_rs1, rs1, 0.U(Parameters.PhysicalRegisterAddrWidth))
+  io.regs_reg2_read_address := Mux(uses_rs2, rs2, 0.U(Parameters.PhysicalRegisterAddrWidth))
   io.ex_immediate := MuxLookup(
     opcode,
     Cat(Fill(20, io.instruction(31)), io.instruction(31, 20))
