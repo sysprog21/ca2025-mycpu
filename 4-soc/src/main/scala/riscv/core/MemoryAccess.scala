@@ -10,7 +10,7 @@ import riscv.core.BusBundle
 import riscv.Parameters
 
 object MemoryAccessStates extends ChiselEnum {
-  val Idle, Read, Write = Value
+  val Idle, Read, Write, AmoWrite = Value
 }
 
 /**
@@ -42,16 +42,24 @@ object MemoryAccessStates extends ChiselEnum {
  */
 class MemoryAccess extends Module {
   val io = IO(new Bundle() {
-    val alu_result          = Input(UInt(Parameters.DataWidth))                 // used as memory address
-    val reg2_data           = Input(UInt(Parameters.DataWidth))
-    val memory_read_enable  = Input(Bool())
-    val memory_write_enable = Input(Bool())
-    val funct3              = Input(UInt(3.W))
-    val regs_write_source   = Input(UInt(2.W))
-    val regs_write_address  = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // destination register
-    val regs_write_enable   = Input(Bool())                                     // register write enable
-    val csr_read_data       = Input(UInt(Parameters.DataWidth))
-    val instruction_address = Input(UInt(Parameters.AddrWidth))                 // For JAL/JALR forwarding (PC+4)
+    val alu_result              = Input(UInt(Parameters.DataWidth))                 // used as memory address
+    val reg2_data               = Input(UInt(Parameters.DataWidth))
+    val memory_read_enable      = Input(Bool())
+    val memory_write_enable     = Input(Bool())
+    val funct3                  = Input(UInt(3.W))
+    val regs_write_source       = Input(UInt(2.W))
+    val regs_write_address      = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // destination register
+    val regs_write_enable       = Input(Bool())                                     // register write enable
+    val csr_read_data           = Input(UInt(Parameters.DataWidth))
+    val instruction_address     = Input(UInt(Parameters.AddrWidth))                 // For JAL/JALR forwarding (PC+4)
+    val is_lr                   = Input(Bool())
+    val is_sc                   = Input(Bool())
+    val is_amo                  = Input(Bool())
+    val amo_funct5              = Input(UInt(5.W))
+    val amo_aq                  = Input(Bool())
+    val amo_rl                  = Input(Bool())
+    val reservation_snoop_valid = Input(Bool())
+    val reservation_snoop_addr  = Input(UInt(Parameters.AddrWidth))
 
     val wb_memory_read_data = Output(UInt(Parameters.DataWidth))
     val forward_to_ex       = Output(UInt(Parameters.DataWidth))
@@ -61,6 +69,7 @@ class MemoryAccess extends Module {
     val wb_regs_write_source  = Output(UInt(2.W))
     val wb_regs_write_address = Output(UInt(Parameters.PhysicalRegisterAddrWidth))
     val wb_regs_write_enable  = Output(Bool())
+    val aqrl_fence_active     = Output(Bool())
 
     val bus = new BusBundle
   })
@@ -89,6 +98,24 @@ class MemoryAccess extends Module {
   // loaded data) because effective_regs_write_source switches too early.
   val read_just_completed = RegInit(false.B)
 
+  val reservation_valid = RegInit(false.B)
+  val reservation_addr  = RegInit(0.U(Parameters.AddrWidth))
+
+  val latched_amo_funct5     = RegInit(0.U(5.W))
+  val latched_reg2_data      = RegInit(0.U(Parameters.DataWidth))
+  val latched_amo_result     = RegInit(0.U(Parameters.DataWidth))
+  val latched_is_amo         = RegInit(false.B)
+  val latched_is_lr          = RegInit(false.B)
+  val latched_is_sc          = RegInit(false.B)
+  val latched_amo_aq         = RegInit(false.B)
+  val latched_amo_rl         = RegInit(false.B)
+  val latched_write_address  = RegInit(0.U(Parameters.AddrWidth))
+  val release_fence_hold     = RegInit(false.B)
+  val acquire_fence_hold     = RegInit(false.B)
+  val release_fence_consumed = RegInit(false.B)
+
+  val atomic_needs_acquire = (latched_is_amo || latched_is_lr || latched_is_sc) && latched_amo_aq
+
   // Helper for common transaction completion logic (state machine reset only)
   def on_bus_transaction_finished() = {
     mem_access_state   := MemoryAccessStates.Idle
@@ -106,6 +133,26 @@ class MemoryAccess extends Module {
     read_just_completed := false.B
   }
 
+  when(release_fence_hold) {
+    release_fence_hold := false.B
+  }
+
+  when(acquire_fence_hold) {
+    acquire_fence_hold := false.B
+  }
+
+  when(mem_access_state =/= MemoryAccessStates.Idle) {
+    release_fence_consumed := false.B
+  }
+
+  when(!(io.is_lr || io.is_sc || io.is_amo)) {
+    release_fence_consumed := false.B
+  }
+
+  when(io.reservation_snoop_valid && reservation_valid && io.reservation_snoop_addr === reservation_addr) {
+    reservation_valid := false.B
+  }
+
   io.bus.request := false.B
   io.bus.read    := false.B
   io.bus.address := io.alu_result(Parameters.AddrBits - 1, log2Up(Parameters.WordSize)) ## 0.U(
@@ -116,6 +163,7 @@ class MemoryAccess extends Module {
   io.bus.write           := false.B
   io.wb_memory_read_data := latched_memory_read_data // Use latched value
   io.ctrl_stall_flag     := false.B
+  io.aqrl_fence_active   := release_fence_hold || acquire_fence_hold
 
   // Misaligned access handling:
   // RISC-V spec allows implementation-defined behavior for misaligned accesses.
@@ -184,15 +232,67 @@ class MemoryAccess extends Module {
           InstructionsTypeL.lw -> data
         )
       )
+
+      val amo_result = MuxLookup(
+        latched_amo_funct5,
+        processed_data
+      )(
+        IndexedSeq(
+          InstructionsTypeA.amoadd  -> (processed_data + latched_reg2_data),
+          InstructionsTypeA.amoswap -> latched_reg2_data,
+          InstructionsTypeA.amoxor  -> (processed_data ^ latched_reg2_data),
+          InstructionsTypeA.amoand  -> (processed_data & latched_reg2_data),
+          InstructionsTypeA.amoor   -> (processed_data | latched_reg2_data),
+          InstructionsTypeA.amomin -> Mux(
+            processed_data.asSInt < latched_reg2_data.asSInt,
+            processed_data,
+            latched_reg2_data
+          ),
+          InstructionsTypeA.amomax -> Mux(
+            processed_data.asSInt > latched_reg2_data.asSInt,
+            processed_data,
+            latched_reg2_data
+          ),
+          InstructionsTypeA.amominu -> Mux(
+            processed_data.asUInt < latched_reg2_data.asUInt,
+            processed_data,
+            latched_reg2_data
+          ),
+          InstructionsTypeA.amomaxu -> Mux(
+            processed_data.asUInt > latched_reg2_data.asUInt,
+            processed_data,
+            latched_reg2_data
+          ),
+        )
+      )
+
       // Store in register for persistence after read_valid goes low
       latched_memory_read_data := processed_data
+      latched_amo_result       := amo_result
       // Also output immediately for forwarding on this cycle
       // Without this, the forwarding path would see the old latch value (0)
       io.wb_memory_read_data := processed_data
       // Signal that a read just completed - used by wb_effective_regs_write_source MUX
       // to extend latched control signals for one more cycle
       read_just_completed := true.B
-      on_bus_transaction_finished()
+      when(latched_is_lr) {
+        reservation_valid := true.B
+        reservation_addr  := latched_write_address
+        when(atomic_needs_acquire) {
+          acquire_fence_hold := true.B
+        }
+        on_bus_transaction_finished()
+      }.elsewhen(latched_is_amo) {
+        mem_access_state    := MemoryAccessStates.AmoWrite
+        io.ctrl_stall_flag  := true.B
+        io.bus.request      := true.B
+        io.bus.write        := true.B
+        io.bus.address      := latched_write_address
+        io.bus.write_data   := amo_result
+        io.bus.write_strobe := VecInit(Seq.fill(Parameters.WordSize)(true.B))
+      }.otherwise {
+        on_bus_transaction_finished()
+      }
     }
   }.elsewhen(mem_access_state === MemoryAccessStates.Write) {
     // In Write state: wait for write_valid (BRESP) to complete transaction
@@ -206,23 +306,83 @@ class MemoryAccess extends Module {
     io.ctrl_stall_flag := true.B
 
     when(io.bus.write_valid) {
+      when(latched_is_sc && atomic_needs_acquire) {
+        acquire_fence_hold := true.B
+      }
+      on_bus_transaction_finished()
+    }
+  }.elsewhen(mem_access_state === MemoryAccessStates.AmoWrite) {
+    io.bus.request      := true.B
+    io.bus.write        := true.B
+    io.bus.address      := latched_write_address
+    io.bus.write_data   := latched_amo_result
+    io.bus.write_strobe := VecInit(Seq.fill(Parameters.WordSize)(true.B))
+    io.ctrl_stall_flag  := true.B
+
+    when(io.bus.write_valid) {
+      when(atomic_needs_acquire) {
+        acquire_fence_hold := true.B
+      }
       on_bus_transaction_finished()
     }
   }.otherwise {
     // Idle state: check enable signals to start new transactions
-    when(io.memory_read_enable) {
-      // Start the read transaction when the bus is available
-      io.ctrl_stall_flag := true.B
-      io.bus.read        := true.B
-      io.bus.request     := true.B
-      // Capture control signals for MEM2WB when read starts
-      // These are latched so that when read_valid arrives and stall releases,
-      // MEM2WB can still capture the correct writeback info for the load instruction
-      latched_regs_write_source  := io.regs_write_source
-      latched_regs_write_address := io.regs_write_address
-      latched_regs_write_enable  := io.regs_write_enable
-      when(io.bus.granted) {
-        mem_access_state := MemoryAccessStates.Read
+    when(io.is_sc) {
+      when(io.amo_rl && !release_fence_consumed) {
+        release_fence_hold     := true.B
+        release_fence_consumed := true.B
+      }.otherwise {
+        val sc_success = reservation_valid && (reservation_addr === io.alu_result)
+        reservation_valid        := false.B
+        latched_memory_read_data := Mux(sc_success, 0.U, 1.U)
+        read_just_completed      := true.B
+        latched_is_sc            := true.B
+        latched_amo_aq           := io.amo_aq
+        latched_amo_rl           := io.amo_rl
+        when(!sc_success) {
+          release_fence_consumed := false.B
+        }
+        when(!sc_success && io.amo_aq) {
+          acquire_fence_hold := true.B
+        }
+        when(sc_success) {
+          io.ctrl_stall_flag    := true.B
+          io.bus.write_data     := io.reg2_data
+          io.bus.write          := true.B
+          io.bus.write_strobe   := VecInit(Seq.fill(Parameters.WordSize)(true.B))
+          io.bus.request        := true.B
+          latched_write_address := io.alu_result
+          when(io.bus.granted) {
+            mem_access_state := MemoryAccessStates.Write
+          }
+        }
+      }
+    }.elsewhen(io.memory_read_enable) {
+      when((io.is_amo || io.is_lr) && io.amo_rl && !release_fence_consumed) {
+        release_fence_hold     := true.B
+        release_fence_consumed := true.B
+      }.otherwise {
+        // Start the read transaction when the bus is available
+        io.ctrl_stall_flag := true.B
+        io.bus.read        := true.B
+        io.bus.request     := true.B
+        // Capture control signals for MEM2WB when read starts
+        // These are latched so that when read_valid arrives and stall releases,
+        // MEM2WB can still capture the correct writeback info for the load instruction
+        latched_regs_write_source  := io.regs_write_source
+        latched_regs_write_address := io.regs_write_address
+        latched_regs_write_enable  := io.regs_write_enable
+        latched_amo_funct5         := io.amo_funct5
+        latched_reg2_data          := io.reg2_data
+        latched_is_amo             := io.is_amo
+        latched_is_lr              := io.is_lr
+        latched_is_sc              := io.is_sc
+        latched_amo_aq             := io.amo_aq
+        latched_amo_rl             := io.amo_rl
+        latched_write_address      := io.alu_result
+        when(io.bus.granted) {
+          mem_access_state := MemoryAccessStates.Read
+        }
       }
     }.elsewhen(io.memory_write_enable) {
       // Start the write transaction when the bus is available
@@ -263,11 +423,19 @@ class MemoryAccess extends Module {
           io.bus.write_strobe(i) := true.B
         }
       }
-      io.bus.request := true.B
+      io.bus.request        := true.B
+      latched_write_address := io.alu_result
+      latched_is_sc         := false.B
+      latched_amo_aq        := false.B
+      latched_amo_rl        := false.B
       when(io.bus.granted) {
         mem_access_state := MemoryAccessStates.Write
       }
     }
+  }
+
+  when(release_fence_hold || acquire_fence_hold) {
+    io.ctrl_stall_flag := true.B
   }
 
   // Forwarding and writeback have different timing requirements!

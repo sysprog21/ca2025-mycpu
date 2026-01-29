@@ -8,6 +8,7 @@ import chisel3._
 import chisel3.util._
 import riscv.core.InstructionTypes
 import riscv.core.Instructions
+import riscv.core.InstructionsTypeA
 import riscv.core.InstructionsTypeI
 import riscv.core.InstructionsTypeR
 
@@ -77,6 +78,24 @@ class ALUControl extends Module {
     }
     is(Instructions.auipc) {
       io.alu_funct := ALUFunctions.add
+    }
+    is(InstructionTypes.AMO) {
+      io.alu_funct := MuxLookup(
+        io.funct7(6, 2),
+        ALUFunctions.zero
+      )(
+        IndexedSeq(
+          InstructionsTypeA.amoadd  -> ALUFunctions.amoadd,
+          InstructionsTypeA.amoswap -> ALUFunctions.amoswap,
+          InstructionsTypeA.amoxor  -> ALUFunctions.amoxor,
+          InstructionsTypeA.amoand  -> ALUFunctions.amoand,
+          InstructionsTypeA.amoor   -> ALUFunctions.amoor,
+          InstructionsTypeA.amomin  -> ALUFunctions.amomin,
+          InstructionsTypeA.amomax  -> ALUFunctions.amomax,
+          InstructionsTypeA.amominu -> ALUFunctions.amominu,
+          InstructionsTypeA.amomaxu -> ALUFunctions.amomaxu
+        )
+      )
     }
   }
 }

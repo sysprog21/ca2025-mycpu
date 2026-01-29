@@ -231,6 +231,8 @@ class Control extends Module {
     // WB stage signals for JAL/JALR hazard detection
     val regs_write_source_wb = Input(UInt(2.W))                                  // mem2wb.io.output_regs_write_source
     val rd_wb                = Input(UInt(Parameters.PhysicalRegisterAddrWidth)) // mem2wb.io.output_regs_write_address
+    val aqrl_fence_active    = Input(Bool())
+    val amo_rl_id            = Input(Bool())
 
     val if_flush = Output(Bool())
     val id_flush = Output(Bool())
@@ -319,8 +321,13 @@ class Control extends Module {
     io.rd_wb =/= 0.U &&
     (io.rd_wb === io.rs1_id || io.rd_wb === io.rs2_id)
 
-  // Complex hazard detection for early branch resolution in ID stage
-  when(
+  // AQ/RL fence handling: pause fetch/decode to preserve ordering after atomics.
+  when(io.aqrl_fence_active || io.amo_rl_id) {
+    io.id_flush      := true.B
+    io.pc_stall      := true.B
+    io.if_stall      := true.B
+    io.branch_hazard := true.B
+  }.elsewhen(
     // ============ Complex Hazard Detection Logic ============
     // This condition detects multiple hazard scenarios requiring stalls:
 

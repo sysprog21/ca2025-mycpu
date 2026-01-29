@@ -131,6 +131,9 @@ abstract class ComplianceTestBase extends AnyFlatSpec with ChiselScalatestTester
    * @param sigFile    Output path for signature file (hex values, one per line)
    * @param annos      ChiselTest annotations for simulation control
    */
+  /**
+   * Run a single RISCOF compliance test on the MyCPU 4-soc implementation.
+   */
   def runComplianceTest(
       asmbinFile: String,
       elfFile: String,
@@ -141,14 +144,23 @@ abstract class ComplianceTestBase extends AnyFlatSpec with ChiselScalatestTester
     // Extract signature region from ELF symbol table
     val (beginSig, endSig) = ElfSignatureExtractor.extractSignatureRange(elfFile)
 
-    // Construct absolute path to test.asmbin from elfFile's directory
-    // The elfFile is like ".../dut/dut.elf" and test.asmbin is in the same directory
-    val elfPath            = java.nio.file.Paths.get(elfFile)
-    val testDir            = elfPath.getParent
-    val absoluteAsmbinPath = testDir.resolve(asmbinFile).toAbsolutePath.toString
+    // FIX START: Handle both local files (RISCOF default) and Resources
+    val elfPath      = java.nio.file.Paths.get(elfFile)
+    val testDir      = elfPath.getParent
+    val resolvedPath = testDir.resolve(asmbinFile)
 
-    // Instantiate 4-soc CPU (pipelined with AXI4-Lite)
-    test(new TestTopModule(absoluteAsmbinPath)).withAnnotations(annos) { c =>
+    // Check if the binary exists where RISCOF generated it (next to the ELF).
+    // If it exists there, use the absolute path.
+    // If NOT, assume it is a Resource file in 'src/main/resources/' and pass just the filename.
+    val finalLoadPath = if (java.nio.file.Files.exists(resolvedPath)) {
+      resolvedPath.toAbsolutePath.toString
+    } else {
+      asmbinFile // e.g., "test_000.asmbin" - The ClassLoader will find this at the resource root
+    }
+    // FIX END
+
+    // Instantiate 4-soc CPU with the corrected path
+    test(new TestTopModule(finalLoadPath)).withAnnotations(annos) { c =>
       // Disable clock timeout - some tests require many cycles
       c.clock.setTimeout(0)
 
