@@ -2,7 +2,7 @@
 // MyCPU is freely redistributable under the MIT License. See the file
 // "LICENSE" for information on usage and redistribution of this file.
 
-package board.verilator
+package board.fpga
 
 import bus.AXI4LiteSlave
 import bus.AXI4LiteSlaveBundle
@@ -13,7 +13,7 @@ import chisel3.stage.ChiselStage
 import peripheral.DummySlave
 import peripheral.Uart
 import peripheral.VGA
-import riscv.core.verilator.CPU
+import riscv.core.fpga.CPU
 import riscv.Parameters
 
 class Top extends Module {
@@ -21,7 +21,8 @@ class Top extends Module {
     val signal_interrupt = Input(Bool())
 
     // Instruction interface (external ROM in testbench)
-    val instruction_address = Output(UInt(Parameters.AddrWidth))
+    val instruction_req     = Output(UInt(Parameters.AddrWidth))
+    val instruction_address = Input(UInt(Parameters.AddrWidth))
     val instruction         = Input(UInt(Parameters.InstructionWidth))
     val instruction_valid   = Input(Bool())
 
@@ -63,9 +64,10 @@ class Top extends Module {
   val bus_switch  = Module(new BusSwitch)
 
   // Instruction fetch (external ROM in testbench)
-  io.instruction_address   := cpu.io.instruction_address
-  cpu.io.instruction       := io.instruction
-  cpu.io.instruction_valid := io.instruction_valid
+  io.instruction_req         := cpu.io.instruction_req
+  cpu.io.instruction_address := io.instruction_address
+  cpu.io.instruction         := io.instruction
+  cpu.io.instruction_valid   := io.instruction_valid
 
   // Terminate unused memory_bundle inputs with explicit values
   // These signals are not used because memory access goes through AXI4-Lite channels,
@@ -118,6 +120,6 @@ class Top extends Module {
 object VerilogGenerator extends App {
   (new ChiselStage).emitVerilog(
     new Top(),
-    Array("--target-dir", "4-soc/verilog/verilator")
+    Array("--target-dir", "4-soc/verilog/fpga")
   )
 }

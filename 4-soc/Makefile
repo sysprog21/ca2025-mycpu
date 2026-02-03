@@ -77,6 +77,17 @@ check-uart: verilator
 		exit 1; \
 	fi
 
+fpga: 
+	@if java -version >/dev/null 2>&1; then \
+                cd .. && PATH=$$HOME/.local/bin:$$PATH sbt "project soc" "runMain board.fpga.VerilogGenerator"; \
+        else \
+                echo "⚠️  Java runtime not found; using existing generated Verilog in verilog/fpga"; \
+                if [ ! -f verilog/fpga/Top.v ]; then \
+                        echo "❌ Top.v missing; install Java (set JAVA_HOME) to regenerate Verilog"; \
+                        exit 1; \
+                fi; \
+        fi
+
 indent:
 	find . -name '*.scala' | xargs scalafmt
 	clang-format -i verilog/verilator/*.cpp verilog/verilator/*.h
