@@ -47,6 +47,12 @@ class ID2EX extends Module {
     val memory_read_enable     = Input(Bool())
     val memory_write_enable    = Input(Bool())
     val csr_read_data          = Input(UInt(Parameters.DataWidth))
+    val is_lr                  = Input(Bool())
+    val is_sc                  = Input(Bool())
+    val is_amo                 = Input(Bool())
+    val amo_funct5             = Input(UInt(5.W))
+    val amo_aq                 = Input(Bool())
+    val amo_rl                 = Input(Bool())
 
     val output_instruction            = Output(UInt(Parameters.DataWidth))
     val output_instruction_address    = Output(UInt(Parameters.AddrWidth))
@@ -65,6 +71,12 @@ class ID2EX extends Module {
     val output_memory_read_enable     = Output(Bool())
     val output_memory_write_enable    = Output(Bool())
     val output_csr_read_data          = Output(UInt(Parameters.DataWidth))
+    val output_is_lr                  = Output(Bool())
+    val output_is_sc                  = Output(Bool())
+    val output_is_amo                 = Output(Bool())
+    val output_amo_funct5             = Output(UInt(5.W))
+    val output_amo_aq                 = Output(Bool())
+    val output_amo_rl                 = Output(Bool())
   })
   val stall = io.stall
 
@@ -169,4 +181,40 @@ class ID2EX extends Module {
   csr_read_data.io.stall  := stall
   csr_read_data.io.flush  := io.flush
   io.output_csr_read_data := csr_read_data.io.out
+
+  val is_lr = Module(new PipelineRegister(1))
+  is_lr.io.in     := io.is_lr
+  is_lr.io.stall  := stall
+  is_lr.io.flush  := io.flush
+  io.output_is_lr := is_lr.io.out
+
+  val is_sc = Module(new PipelineRegister(1))
+  is_sc.io.in     := io.is_sc
+  is_sc.io.stall  := stall
+  is_sc.io.flush  := io.flush
+  io.output_is_sc := is_sc.io.out
+
+  val is_amo = Module(new PipelineRegister(1))
+  is_amo.io.in     := io.is_amo
+  is_amo.io.stall  := stall
+  is_amo.io.flush  := io.flush
+  io.output_is_amo := is_amo.io.out
+
+  val amo_funct5 = Module(new PipelineRegister(5))
+  amo_funct5.io.in     := io.amo_funct5
+  amo_funct5.io.stall  := stall
+  amo_funct5.io.flush  := io.flush
+  io.output_amo_funct5 := amo_funct5.io.out
+
+  val amo_aq = Module(new PipelineRegister(1))
+  amo_aq.io.in     := io.amo_aq
+  amo_aq.io.stall  := stall
+  amo_aq.io.flush  := io.flush
+  io.output_amo_aq := amo_aq.io.out
+
+  val amo_rl = Module(new PipelineRegister(1))
+  amo_rl.io.in     := io.amo_rl
+  amo_rl.io.stall  := stall
+  amo_rl.io.flush  := io.flush
+  io.output_amo_rl := amo_rl.io.out
 }

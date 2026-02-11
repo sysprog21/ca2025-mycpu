@@ -41,13 +41,15 @@ import riscv.Parameters
  */
 class BusSwitch extends Module {
   val io = IO(new Bundle {
-    val address = Input(UInt(Parameters.AddrWidth))
-    val slaves  = Vec(Parameters.SlaveDeviceCount, new AXI4LiteChannels(Parameters.AddrBits, Parameters.DataBits))
-    val master  = Flipped(new AXI4LiteChannels(Parameters.AddrBits, Parameters.DataBits))
+    val address        = Input(UInt(Parameters.AddrWidth))
+    val slaves         = Vec(Parameters.SlaveDeviceCount, new AXI4LiteChannels(Parameters.AddrBits, Parameters.DataBits))
+    val master         = Flipped(new AXI4LiteChannels(Parameters.AddrBits, Parameters.DataBits))
+    val selected_slave = Output(UInt(Parameters.SlaveDeviceCountBits.W))
   })
 
   val index = io.address(Parameters.AddrBits - 1, Parameters.AddrBits - Parameters.SlaveDeviceCountBits)
   val sel   = UIntToOH(index, Parameters.SlaveDeviceCount)
+  io.selected_slave := index
 
   // Latched slave selection for response channels (hardening fix).
   // This ensures stable response routing even if io.address changes mid-transaction.

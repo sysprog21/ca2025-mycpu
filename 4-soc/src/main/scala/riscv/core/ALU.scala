@@ -17,7 +17,9 @@ import riscv.Parameters
  * but don't need a separate zero output).
  */
 object ALUFunctions extends ChiselEnum {
-  val zero, add, sub, sll, slt, xor, or, and, srl, sra, sltu = Value
+  val zero, add, sub, sll, slt, xor, or, and, srl, sra, sltu, amoadd, amoxor, amoand, amoor, amomin, amomax, amominu,
+      amomaxu, amoswap =
+    Value
 }
 
 /**
@@ -75,6 +77,33 @@ class ALU extends Module {
     }
     is(ALUFunctions.sltu) {
       io.result := io.op1 < io.op2
+    }
+    is(ALUFunctions.amoadd) {
+      io.result := io.op1 + io.op2
+    }
+    is(ALUFunctions.amoswap) {
+      io.result := io.op2
+    }
+    is(ALUFunctions.amoxor) {
+      io.result := io.op1 ^ io.op2
+    }
+    is(ALUFunctions.amoand) {
+      io.result := io.op1 & io.op2
+    }
+    is(ALUFunctions.amoor) {
+      io.result := io.op1 | io.op2
+    }
+    is(ALUFunctions.amomin) {
+      io.result := Mux(io.op1.asSInt < io.op2.asSInt, io.op1, io.op2)
+    }
+    is(ALUFunctions.amomax) {
+      io.result := Mux(io.op1.asSInt > io.op2.asSInt, io.op1, io.op2)
+    }
+    is(ALUFunctions.amominu) {
+      io.result := Mux(io.op1.asUInt < io.op2.asUInt, io.op1, io.op2)
+    }
+    is(ALUFunctions.amomaxu) {
+      io.result := Mux(io.op1.asUInt > io.op2.asUInt, io.op1, io.op2)
     }
   }
 }

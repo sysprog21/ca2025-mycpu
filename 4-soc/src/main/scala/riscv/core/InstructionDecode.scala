@@ -36,6 +36,12 @@ class InstructionDecode extends Module {
     val ex_reg_write_address   = Output(UInt(Parameters.PhysicalRegisterAddrWidth))
     val ex_csr_address         = Output(UInt(Parameters.CSRRegisterAddrWidth))
     val ex_csr_write_enable    = Output(Bool())
+    val ex_is_lr               = Output(Bool())
+    val ex_is_sc               = Output(Bool())
+    val ex_is_amo              = Output(Bool())
+    val ex_amo_funct5          = Output(UInt(5.W))
+    val ex_amo_aq              = Output(Bool())
+    val ex_amo_rl              = Output(Bool())
     val ctrl_jump_instruction  = Output(Bool())                     // ctrl.io.jump_instruction_id
     val clint_jump_flag        = Output(Bool())                     // clint.io.jump_flag
     val clint_jump_address     = Output(UInt(Parameters.AddrWidth)) // clint.io.jump_address
@@ -48,6 +54,9 @@ class InstructionDecode extends Module {
   val rd     = io.instruction(11, 7)
   val rs1    = io.instruction(19, 15)
   val rs2    = io.instruction(24, 20)
+  val aq     = io.instruction(26)
+  val rl     = io.instruction(25)
+  val funct5 = io.instruction(31, 27)
 
   // Track which operands are actually used to avoid false hazards/stalls on
   // encodings that reuse rs1/rs2 bits for immediates (JAL, CSR immediate, etc.).
@@ -56,10 +65,18 @@ class InstructionDecode extends Module {
       funct3 === InstructionsTypeCSR.csrrci ||
       funct3 === InstructionsTypeCSR.csrrsi
   )
+
+  val is_amo = opcode === InstructionTypes.AMO
+  val is_lr  = is_amo && funct5 === InstructionsTypeA.lr
+  val is_sc  = is_amo && funct5 === InstructionsTypeA.sc
+
   val uses_rs1 = (opcode === InstructionTypes.RM) || (opcode === InstructionTypes.I) ||
     (opcode === InstructionTypes.L) || (opcode === InstructionTypes.S) || (opcode === InstructionTypes.B) ||
-    (opcode === Instructions.jalr) || (opcode === Instructions.csr && !csr_uses_uimm)
-  val uses_rs2 = (opcode === InstructionTypes.RM) || (opcode === InstructionTypes.S) || (opcode === InstructionTypes.B)
+    (opcode === Instructions.jalr) || (opcode === Instructions.csr && !csr_uses_uimm) ||
+    (opcode === InstructionTypes.AMO)
+  val uses_rs2 =
+    (opcode === InstructionTypes.RM) || (opcode === InstructionTypes.S) || (opcode === InstructionTypes.B) ||
+      (opcode === InstructionTypes.AMO && !is_lr)
 
   io.regs_reg1_read_address := Mux(uses_rs1, rs1, 0.U(Parameters.PhysicalRegisterAddrWidth))
   io.regs_reg2_read_address := Mux(uses_rs2, rs2, 0.U(Parameters.PhysicalRegisterAddrWidth))
@@ -79,8 +96,9 @@ class InstructionDecode extends Module {
         io.instruction(11, 8),
         0.U(1.W)
       ),
-      Instructions.lui   -> Cat(io.instruction(31, 12), 0.U(12.W)),
-      Instructions.auipc -> Cat(io.instruction(31, 12), 0.U(12.W)),
+      InstructionTypes.AMO -> 0.U(Parameters.DataWidth),
+      Instructions.lui     -> Cat(io.instruction(31, 12), 0.U(12.W)),
+      Instructions.auipc   -> Cat(io.instruction(31, 12), 0.U(12.W)),
       Instructions.jal -> Cat(
         Fill(12, io.instruction(31)),
         io.instruction(19, 12),
@@ -100,22 +118,24 @@ class InstructionDecode extends Module {
     ALUOp2Source.Register,
     ALUOp2Source.Immediate
   )
-  io.ex_memory_read_enable  := opcode === InstructionTypes.L
-  io.ex_memory_write_enable := opcode === InstructionTypes.S
+  io.ex_memory_read_enable  := opcode === InstructionTypes.L || (opcode === InstructionTypes.AMO && !is_sc)
+  io.ex_memory_write_enable := opcode === InstructionTypes.S || (opcode === InstructionTypes.AMO && !is_lr)
   io.ex_reg_write_source := MuxLookup(
     opcode,
     RegWriteSource.ALUResult
   )(
     IndexedSeq(
-      InstructionTypes.L -> RegWriteSource.Memory,
-      Instructions.csr   -> RegWriteSource.CSR,
-      Instructions.jal   -> RegWriteSource.NextInstructionAddress,
-      Instructions.jalr  -> RegWriteSource.NextInstructionAddress
+      InstructionTypes.L   -> RegWriteSource.Memory,
+      InstructionTypes.AMO -> RegWriteSource.Memory,
+      Instructions.csr     -> RegWriteSource.CSR,
+      Instructions.jal     -> RegWriteSource.NextInstructionAddress,
+      Instructions.jalr    -> RegWriteSource.NextInstructionAddress
     )
   )
   io.ex_reg_write_enable := (opcode === InstructionTypes.RM) || (opcode === InstructionTypes.I) ||
     (opcode === InstructionTypes.L) || (opcode === Instructions.auipc) || (opcode === Instructions.lui) ||
-    (opcode === Instructions.jal) || (opcode === Instructions.jalr) || (opcode === Instructions.csr)
+    (opcode === Instructions.jal) || (opcode === Instructions.jalr) || (opcode === Instructions.csr) ||
+    (opcode === InstructionTypes.AMO)
   io.ex_reg_write_address := io.instruction(11, 7)
   io.ex_csr_address       := io.instruction(31, 20)
   io.ex_csr_write_enable := (opcode === Instructions.csr) && (
@@ -123,6 +143,12 @@ class InstructionDecode extends Module {
       funct3 === InstructionsTypeCSR.csrrs || funct3 === InstructionsTypeCSR.csrrsi ||
       funct3 === InstructionsTypeCSR.csrrc || funct3 === InstructionsTypeCSR.csrrci
   )
+  io.ex_is_lr      := is_lr
+  io.ex_is_sc      := is_sc
+  io.ex_is_amo     := is_amo && !is_lr && !is_sc
+  io.ex_amo_funct5 := funct5
+  io.ex_amo_aq     := aq
+  io.ex_amo_rl     := rl
 
 //  io.clint_jump_flag := io.interrupt_assert
 //  io.clint_jump_address := io.interrupt_handler_address

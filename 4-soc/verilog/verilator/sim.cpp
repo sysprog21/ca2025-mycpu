@@ -2,7 +2,14 @@
 // MyCPU is freely redistributable under the MIT License. See the file
 // "LICENSE" for information on usage and redistribution of this file.
 
+#ifndef VM_TRACE
+#define VM_TRACE 1
+#endif
+#ifndef VM_TRACE_VCD
+#define VM_TRACE_VCD 1
+#endif
 #include <verilated.h>
+#include <verilated_vcd_c.h>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -10,6 +17,7 @@
 #include <iostream>
 #include <memory>
 #include <queue>
+#include <string>
 #include <vector>
 
 // Terminal I/O for interactive UART
@@ -22,6 +30,40 @@
 
 static constexpr uint32_t UART_TEST_PASS = 0x0F;  // 4 subtests
 static constexpr uint32_t VGA_TEST_PASS = 0x3F;   // 6 subtests
+
+class VCDTracer
+{
+    VerilatedVcdC *tfp = nullptr;
+
+public:
+    void enable(const std::string &filename, VTop &top)
+    {
+        Verilated::traceEverOn(true);
+        tfp = new VerilatedVcdC;
+        top.trace(tfp, 99);
+        tfp->open(filename.c_str());
+        tfp->set_time_resolution("1ps");
+        tfp->set_time_unit("1ns");
+        if (!tfp->isOpen()) {
+            throw std::runtime_error("Failed to open VCD dump file " +
+                                     filename);
+        }
+    }
+
+    void dump(vluint64_t time)
+    {
+        if (tfp)
+            tfp->dump(time);
+    }
+
+    ~VCDTracer()
+    {
+        if (tfp) {
+            tfp->close();
+            delete tfp;
+        }
+    }
+};
 
 // UART terminal interface for interactive mode
 // Simulates 115200 baud, 8N2 (8 data bits, no parity, 2 stop bits)
@@ -327,12 +369,15 @@ int main(int argc, char **argv)
     Verilated::commandArgs(argc, argv);
 
     const char *binary = nullptr;
+    const char *vcd_path = nullptr;
     bool headless = false;
     bool interactive_mode = false;
     for (int i = 1; i < argc; i++) {
         if ((!strcmp(argv[i], "-instruction") || !strcmp(argv[i], "-i")) &&
             i + 1 < argc)
             binary = argv[++i];
+        else if (!strcmp(argv[i], "-vcd") && i + 1 < argc)
+            vcd_path = argv[++i];
         else if (!strcmp(argv[i], "--headless") || !strcmp(argv[i], "-H"))
             headless = true;
         else if (!strcmp(argv[i], "--terminal") || !strcmp(argv[i], "-t"))
@@ -340,12 +385,14 @@ int main(int argc, char **argv)
     }
 
     auto top = std::make_unique<VTop>();
+    auto vcd_tracer = std::make_unique<VCDTracer>();
     Memory mem(4 * 1024 * 1024);  // 4MB (stack starts at 0x400000)
 
     if (!binary) {
         std::cerr
             << "Usage: " << argv[0]
-            << " -i <binary.asmbin> [--headless|-H] [--terminal|-t]\n"
+            << " -i <binary.asmbin> [-vcd <trace.vcd>] [--headless|-H] "
+               "[--terminal|-t]\n"
             << "  --headless: Skip VGA display\n"
             << "  --terminal: Interactive UART terminal (Ctrl-C to exit)\n";
         return 1;
@@ -402,6 +449,15 @@ int main(int argc, char **argv)
         top->eval();
     }
     top->reset = 0;
+    if (vcd_path) {
+        try {
+            vcd_tracer->enable(vcd_path, *top);
+        } catch (const std::exception &e) {
+            std::cerr << e.what() << "\n";
+            return 1;
+        }
+        vcd_tracer->dump(0);
+    }
 
     // Initialize inputs
     top->io_signal_interrupt = 0;
@@ -435,7 +491,8 @@ int main(int argc, char **argv)
         // This creates a stable snapshot of all DUT outputs for this clock
         // edge.
         top->eval();
-
+        vcd_tracer->dump(cycle + 1);
+    
         // =====================================================================
         // CAPTURE PHASE: Snapshot all DUT outputs immediately after eval().
         // This implements the "Capture and Defer" pattern recommended for

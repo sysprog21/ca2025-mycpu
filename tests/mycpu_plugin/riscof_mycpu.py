@@ -150,7 +150,8 @@ class mycpu(pluginTemplate):
         project_map = {
             '1-single-cycle': 'singleCycle',
             '2-mmio-trap': 'mmioTrap',
-            '3-pipeline': 'pipeline'
+            '3-pipeline': 'pipeline',
+            '4-soc': 'soc'
         }
         sbt_project_name = project_map.get(project_dir_name, 'singleCycle')
         parent_dir = os.path.dirname(self.mycpu_project)

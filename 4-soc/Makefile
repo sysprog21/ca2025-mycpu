@@ -5,6 +5,8 @@
 # Include common build utilities
 include ../common/build.mk
 
+SIM_VCD ?= trace.vcd
+
 test:
 	cd .. && sbt "project soc" test
 
@@ -18,7 +20,7 @@ verilator:
 			exit 1; \
 		fi; \
 	fi
-	cd verilog/verilator && verilator --exe --cc sim.cpp Top.v \
+	cd verilog/verilator && verilator --trace --exe --cc sim.cpp Top.v \
 		-CFLAGS "$$(sdl2-config --cflags)" \
 		-LDFLAGS "$$(sdl2-config --libs)" && \
 		make -C obj_dir -f VTop.mk
@@ -34,7 +36,7 @@ sim: verilator
 		exit 1; \
 	fi
 	@echo "🎮 Running simulation with $(BINARY)..."
-	cd verilog/verilator/obj_dir && ./VTop -i ../../../$(BINARY)
+	cd verilog/verilator/obj_dir && ./VTop -i ../../../$(BINARY) -vcd ../../../$(SIM_VCD)
 
 check-vga: verilator
 	@echo "🔄 Building nyancat binary..."

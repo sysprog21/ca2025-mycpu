@@ -127,6 +127,22 @@ object AXI4LiteStates extends ChiselEnum {
   val Idle, ReadAddr, ReadData, WriteAddr, WriteData, WriteResp = Value
 }
 
+object AXI4LiteDefaults {
+  def tieOffMaster(channels: AXI4LiteChannels): Unit = {
+    channels.write_address_channel.AWVALID := false.B
+    channels.write_address_channel.AWADDR  := 0.U
+    channels.write_address_channel.AWPROT  := 0.U
+    channels.write_data_channel.WVALID     := false.B
+    channels.write_data_channel.WDATA      := 0.U
+    channels.write_data_channel.WSTRB      := 0.U
+    channels.write_response_channel.BREADY := false.B
+    channels.read_address_channel.ARVALID  := false.B
+    channels.read_address_channel.ARADDR   := 0.U
+    channels.read_address_channel.ARPROT   := 0.U
+    channels.read_data_channel.RREADY      := false.B
+  }
+}
+
 class AXI4LiteSlave(addrWidth: Int, dataWidth: Int) extends Module {
   val io = IO(new Bundle {
     val channels = Flipped(new AXI4LiteChannels(addrWidth, dataWidth))

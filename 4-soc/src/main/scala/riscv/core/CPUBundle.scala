@@ -25,6 +25,10 @@ class CPUBundle extends Bundle {
   // Interrupt
   val interrupt_flag = Input(UInt(Parameters.InterruptFlagWidth))
 
+  // Reservation snoop for LR/SC invalidation (from shared bus)
+  val reservation_snoop_valid = Input(Bool())
+  val reservation_snoop_addr  = Input(UInt(Parameters.AddrWidth))
+
   // Debug interfaces
   val debug_read_address = Input(UInt(Parameters.PhysicalRegisterAddrWidth))
   val debug_read_data    = Output(UInt(Parameters.DataWidth))

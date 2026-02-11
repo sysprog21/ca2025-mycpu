@@ -8,11 +8,12 @@ import chisel3._
 import riscv.Parameters
 
 object InstructionTypes {
-  val L  = "b0000011".U
-  val I  = "b0010011".U
-  val S  = "b0100011".U
-  val RM = "b0110011".U
-  val B  = "b1100011".U
+  val L   = "b0000011".U
+  val I   = "b0010011".U
+  val S   = "b0100011".U
+  val RM  = "b0110011".U
+  val B   = "b1100011".U
+  val AMO = "b0101111".U
 }
 
 object Instructions {
@@ -88,6 +89,24 @@ object InstructionsTypeCSR {
   val csrrwi = "b101".U
   val csrrsi = "b110".U
   val csrrci = "b111".U
+}
+
+object InstructionsTypeAWidth {
+  val word = "b010".U
+}
+
+object InstructionsTypeA {
+  val amoadd  = "b00000".U
+  val amoswap = "b00001".U
+  val lr      = "b00010".U
+  val sc      = "b00011".U
+  val amoxor  = "b00100".U
+  val amoor   = "b01000".U
+  val amoand  = "b01100".U
+  val amomin  = "b10000".U
+  val amomax  = "b10100".U
+  val amominu = "b11000".U
+  val amomaxu = "b11100".U
 }
 
 object InstructionsNop {

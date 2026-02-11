@@ -5,6 +5,7 @@
 package bus
 
 import chisel3._
+import chisel3.util._
 import riscv.Parameters
 
 /**
@@ -29,19 +30,34 @@ class BusArbiter extends Module {
     val bus_request     = Input(Vec(Parameters.MasterDeviceCount, Bool()))
     val bus_granted     = Output(Vec(Parameters.MasterDeviceCount, Bool()))
     val ctrl_stall_flag = Output(Bool())
+    val granted_index   = Output(UInt(log2Up(Parameters.MasterDeviceCount).W))
   })
 
-  val granted = Wire(UInt())
-  // Static Priority Arbitration
-  // Higher number = Higher priority
-  granted := 0.U
+  val active_grant  = RegInit(false.B)
+  val current_grant = RegInit(0.U(log2Up(Parameters.MasterDeviceCount).W))
+
+  val next_grant = Wire(UInt(log2Up(Parameters.MasterDeviceCount).W))
+  next_grant := 0.U
   for (i <- 0 until Parameters.MasterDeviceCount) {
     when(io.bus_request(i.U)) {
-      granted := i.U
+      next_grant := i.U
     }
   }
-  for (i <- 0 until Parameters.MasterDeviceCount) {
-    io.bus_granted(i.U) := i.U === granted
+
+  when(active_grant) {
+    when(!io.bus_request(current_grant)) {
+      active_grant := false.B
+    }
+  }.otherwise {
+    when(io.bus_request.asUInt.orR) {
+      active_grant  := true.B
+      current_grant := next_grant
+    }
   }
-  io.ctrl_stall_flag := !io.bus_granted(0.U)
+
+  for (i <- 0 until Parameters.MasterDeviceCount) {
+    io.bus_granted(i.U) := active_grant && (current_grant === i.U)
+  }
+  io.ctrl_stall_flag := !active_grant
+  io.granted_index   := current_grant
 }

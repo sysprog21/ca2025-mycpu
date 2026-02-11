@@ -3,7 +3,7 @@ ENTRY(_start)
 
 SECTIONS
 {
-  . = 0x00001000;
+  . = 0x80000000;
   .text : { *(.text.init) *(.text.startup) *(.text) }
   .data ALIGN(0x1000) : {
     *(.data*)
@@ -23,10 +23,16 @@ SECTIONS
     __sbss_end = .;
     __sdata_end = .;
   }
-  . = 0x00100000;
+  .tohost ALIGN(0x1000) : {
+    . = ALIGN(8);
+    tohost = .;
+    QUAD(0);
+    fromhost = .;
+    QUAD(0);
+  }
+  . = 0x80100000;
   .bss ALIGN(0x1000) : {
     . = ALIGN(4);
-    KEEP(*(.ringbuf_result))
     __bss_start = .;
     *(.bss*)
     *(COMMON)
